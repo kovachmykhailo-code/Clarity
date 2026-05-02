@@ -1,0 +1,3093 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clarity — Project Management System</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23111210'/%3E%3Cpath d='M32 10l19 11v22L32 54 13 43V21z' fill='none' stroke='%23d5b165' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%238acdb4'/%3E%3C/svg%3E">
+  <!-- Firebase v10 modular SDK via compat layer -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --casal: #29585E;
+      --beryl: #E2E2B9;
+      --bg: #f6f5e8;
+      --panel: rgba(255, 255, 241, .9);
+      --panel-solid: #fffff1;
+      --panel-2: #d9dfc4;
+      --text: #173b40;
+      --muted: #526f70;
+      --faint: #7f9290;
+      --line: rgba(41, 88, 94, .18);
+      --gold: #a88c4a;
+      --gold-2: #cfb66b;
+      --mint: #78c0aa;
+      --mint-2: rgba(120, 192, 170, .2);
+      --danger: #b84f42;
+      --warning: #aa7c2e;
+      --success: #3f8a65;
+      --blue: #29585E;
+      --shadow: 0 22px 70px rgba(41, 88, 94, .11);
+      --soft-shadow: 7px 7px 18px rgba(41, 88, 94, .12), -7px -7px 18px rgba(255, 255, 241, .8);
+      --inset: inset 4px 4px 10px rgba(41, 88, 94, .16), inset -4px -4px 10px rgba(255, 255, 244, .8);
+      --radius: 8px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    [data-theme="dark"] {
+      --bg: #122528;
+      --panel: rgba(33, 68, 72, .84);
+      --panel-solid: #183438;
+      --panel-2: #29585E;
+      --text: #E2E2B9;
+      --muted: rgba(226, 226, 185, .75);
+      --faint: rgba(226, 226, 185, .5);
+      --line: rgba(226, 226, 185, .16);
+      --gold: #d1bb73;
+      --gold-2: #E2E2B9;
+      --mint: #9ad2bc;
+      --mint-2: rgba(226, 226, 185, .12);
+      --danger: #ff8b75;
+      --warning: #e2b35d;
+      --success: #9bd5a8;
+      --blue: #E2E2B9;
+      --shadow: 0 28px 80px rgba(7, 23, 25, .38);
+      --soft-shadow: 7px 7px 18px rgba(0, 0, 0, .24), -7px -7px 18px rgba(255, 255, 255, .035);
+      --inset: inset 4px 4px 10px rgba(0, 0, 0, .38), inset -4px -4px 10px rgba(255, 255, 255, .04);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(226, 226, 185, .48), transparent 30%),
+        linear-gradient(135deg, var(--bg), var(--panel-2));
+      color: var(--text);
+      font-family: var(--font);
+      letter-spacing: 0;
+    }
+
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    .app {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 22px 16px;
+      background: linear-gradient(180deg, #29585E, #183438);
+      color: var(--beryl);
+      border-right: 1px solid rgba(255, 255, 255, .08);
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+      padding: 0 4px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: linear-gradient(145deg, #356a70, #183438);
+      box-shadow: inset 1px 1px 0 rgba(255,255,255,.1), 0 12px 30px rgba(0,0,0,.3);
+      color: var(--gold-2);
+      flex: 0 0 auto;
+    }
+    .brand-title { font-size: 17px; font-weight: 600; line-height: 1; }
+    .brand-subtitle { margin-top: 5px; color: rgba(247,240,227,.56); font-size: 11px; }
+
+    .nav { display: grid; gap: 6px; }
+    .nav button {
+      width: 100%;
+      min-height: 42px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: rgba(226,226,185,.75);
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      align-items: center;
+      gap: 11px;
+      padding: 0 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: transform .18s ease, color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+    .nav button:hover { color: var(--beryl); background: rgba(226,226,185,.08); }
+    .nav button.active {
+      color: var(--beryl);
+      background: linear-gradient(145deg, rgba(226,226,185,.18), rgba(120,192,170,.1));
+      box-shadow: inset 1px 1px 0 rgba(255,255,255,.1), inset -1px -1px 0 rgba(0,0,0,.2);
+    }
+    .nav span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(255,255,255,.04);
+      color: rgba(247,240,227,.6);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .main {
+      min-width: 0;
+      padding: 22px clamp(16px, 3vw, 34px) 40px;
+    }
+    .topbar {
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 42px);
+      line-height: 1;
+      font-weight: 500;
+    }
+    .topbar p { margin: 7px 0 0; color: var(--muted); font-size: 14px; }
+    .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+    .btn {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 13px;
+      background: var(--panel);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+      white-space: nowrap;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: var(--soft-shadow); }
+    .btn-primary {
+      border-color: rgba(184,147,79,.45);
+      background: linear-gradient(145deg, var(--gold-2), var(--gold));
+      color: #18130c;
+      font-weight: 600;
+    }
+    .btn-ghost { background: transparent; }
+    .icon-btn { width: 38px; padding: 0; }
+    .btn svg, .icon-btn svg, .nav svg { width: 18px; height: 18px; stroke-width: 1.7; }
+
+    .page { display: none; animation: rise .36s ease both; }
+    .page.active { display: block; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .grid { display: grid; gap: 16px; }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .wide-grid { grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .card.pad { padding: 18px; }
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .eyebrow {
+      margin-bottom: 6px;
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .card-title { margin: 0; font-size: 16px; line-height: 1.25; font-weight: 500; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: 12px; }
+
+    .metric {
+      min-height: 132px;
+      padding: 17px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-top: 3px solid var(--gold);
+    }
+    .metric-value { font-size: 34px; line-height: 1; font-weight: 600; letter-spacing: 0; }
+    .metric-label { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .metric-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--mint-2);
+      color: var(--success);
+      box-shadow: var(--inset);
+    }
+
+    .clarity-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      align-items: stretch;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .clarity-panel {
+      min-height: 220px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.72), rgba(255,255,255,.32)),
+        var(--panel);
+    }
+    [data-theme="dark"] .clarity-panel {
+      background:
+        linear-gradient(135deg, rgba(213,177,101,.1), rgba(158,224,197,.05)),
+        var(--panel);
+    }
+    .clarity-panel h2 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(28px, 5vw, 58px);
+      line-height: .95;
+      font-weight: 500;
+    }
+    .clarity-panel p { max-width: 640px; margin: 16px 0 0; color: var(--muted); line-height: 1.6; }
+    .pure-clarity {
+      min-height: 220px;
+      padding: 20px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+      background: linear-gradient(145deg, var(--panel-solid), var(--panel-2));
+      box-shadow: var(--soft-shadow);
+    }
+    .pure-ring {
+      --pct: 72;
+      width: 132px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--mint) calc(var(--pct) * 1%), rgba(128,128,128,.15) 0);
+      box-shadow: var(--inset);
+      margin-bottom: 12px;
+    }
+    .pure-ring::before {
+      content: attr(data-value);
+      width: 94px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--panel-solid);
+      font-size: 25px;
+      font-weight: 600;
+    }
+
+    .task-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 62px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.22);
+      margin-bottom: 8px;
+      transition: transform .18s ease, border .18s ease, background .18s ease;
+    }
+    [data-theme="dark"] .task-row { background: rgba(255,255,255,.03); }
+    .task-row:hover { transform: translateY(-1px); border-color: rgba(184,147,79,.42); }
+    .check {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      background: var(--panel);
+    }
+    .check.done {
+      color: #132017;
+      background: var(--mint);
+      border-color: transparent;
+    }
+    .task-title { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .task-meta { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 7px; color: var(--muted); font-size: 12px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 24px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.22);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    [data-theme="dark"] .pill { background: rgba(255,255,255,.04); }
+    .pill.gold { color: var(--gold-2); border-color: rgba(184,147,79,.35); }
+    .pill.mint { color: var(--success); border-color: rgba(90,155,117,.35); }
+    .pill.danger { color: var(--danger); border-color: rgba(215,92,72,.35); }
+    .pill.warning { color: var(--warning); border-color: rgba(200,140,53,.35); }
+
+    .progress {
+      width: 100%;
+      height: 9px;
+      background: rgba(127,127,127,.14);
+      border-radius: 999px;
+      overflow: hidden;
+      box-shadow: var(--inset);
+    }
+    .progress > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--mint), var(--gold-2));
+      transition: width .8s cubic-bezier(.2,.8,.2,1);
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .quadrant {
+      min-height: 190px;
+      padding: 13px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.18);
+      transition: background .16s ease, border-color .16s ease;
+    }
+    .quadrant.drag-over { background: rgba(184,147,79,.1); border-color: rgba(184,147,79,.45); }
+    [data-theme="dark"] .quadrant { background: rgba(255,255,255,.03); }
+    .quadrant h3 { margin: 0 0 10px; font-size: 13px; }
+    .mini-task {
+      padding: 9px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      background: var(--panel-solid);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      cursor: grab;
+      transition: box-shadow .15s ease, transform .15s ease;
+    }
+    .mini-task:active { cursor: grabbing; }
+    .mini-task[draggable="true"]:hover { box-shadow: var(--soft-shadow); transform: translateY(-1px); }
+
+    /* ── Project grid: auto-fit so cards reflow naturally ── */
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+
+    .project-card {
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease,
+                  opacity .28s ease, filter .28s ease;
+    }
+    .project-card:hover { transform: translateY(-2px); box-shadow: var(--soft-shadow); }
+
+    /* Active card — vivid, full size */
+    .project-card.is-active {
+      border-color: rgba(184,147,79,.55);
+      box-shadow: 0 0 0 2px rgba(184,147,79,.25), var(--shadow);
+    }
+    .project-card.is-active:hover { transform: translateY(-3px); }
+
+    /* Inactive cards — dimmed and slightly scaled down */
+    .project-card.is-inactive {
+      opacity: .52;
+      filter: saturate(.35);
+      transform: scale(.96);
+    }
+    .project-card.is-inactive:hover {
+      opacity: .85;
+      filter: saturate(.7);
+      transform: scale(.98) translateY(-1px);
+    }
+
+    .cover {
+      height: 118px;
+      background-size: cover;
+      background-position: center;
+      transition: height .28s ease;
+    }
+    .project-card.is-active .cover { height: 148px; }
+
+    .project-body { padding: 14px; }
+    .project-body h3 { margin: 0 0 8px; font-size: 15px; }
+
+    /* Danger icon-btn variant — trash icon, red on hover */
+    .btn-danger { color: var(--danger); border-color: rgba(184,79,66,.28); }
+    .btn-danger:hover { background: rgba(184,79,66,.08); }
+    .detail-panel {
+      margin-top: 16px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .domain-row {
+      display: grid;
+      grid-template-columns: 1fr 120px auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .domain-row:last-child { border-bottom: 0; }
+    .swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    .health {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--success) var(--score), rgba(127,127,127,.16) 0);
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .health::before {
+      content: attr(data-score);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--panel-solid);
+    }
+
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .field { display: grid; gap: 6px; }
+    label { color: var(--muted); font-size: 12px; font-weight: 500; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-solid);
+      color: var(--text);
+      min-height: 38px;
+      padding: 8px 10px;
+      outline: 0;
+    }
+    textarea { min-height: 82px; resize: vertical; }
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(184,147,79,.6);
+      box-shadow: 0 0 0 3px rgba(184,147,79,.12);
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-bottom: 14px;
+    }
+    .tab {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-height: 34px;
+      padding: 0 12px;
+      background: var(--panel);
+      cursor: pointer;
+    }
+    .tab.active {
+      background: var(--text);
+      color: var(--bg);
+      box-shadow: var(--inset);
+    }
+
+    .note-card {
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.18);
+      min-height: 120px;
+    }
+    [data-theme="dark"] .note-card { background: rgba(255,255,255,.03); }
+    .note-card h3 { margin: 0 0 8px; font-size: 14px; }
+    .note-card a { color: var(--gold); word-break: break-word; }
+
+    .session-row {
+      display: grid;
+      grid-template-columns: 86px minmax(0,1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .session-row:last-child { border-bottom: 0; }
+    .date-box {
+      border-radius: 8px;
+      background: var(--panel-solid);
+      border: 1px solid var(--line);
+      padding: 9px;
+      text-align: center;
+      box-shadow: var(--inset);
+    }
+    .date-box strong { display: block; font-size: 20px; }
+    .date-box span { color: var(--muted); font-size: 11px; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(0,0,0,.45);
+      z-index: 20;
+    }
+    .modal-backdrop.open { display: grid; }
+    .modal {
+      width: min(760px, 100%);
+      max-height: min(760px, 92vh);
+      overflow: auto;
+      background: var(--panel-solid);
+      color: var(--text);
+      border-radius: 8px;
+      box-shadow: 0 30px 90px rgba(0,0,0,.34);
+      border: 1px solid var(--line);
+    }
+    .modal-head, .modal-foot {
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .modal-foot { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; }
+    .modal-content { padding: 16px; }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      transform: translateY(20px);
+      opacity: 0;
+      z-index: 30;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-solid);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    canvas { max-height: 290px; }
+
+    /* ── Auth screen ── */
+    #authScreen {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 15% 10%, rgba(226,226,185,.35), transparent 35%),
+                  linear-gradient(145deg, #122528, #183438);
+      padding: 20px;
+    }
+    #authScreen.hidden { display: none; }
+    .auth-card {
+      width: min(420px, 100%);
+      background: rgba(33, 68, 72, .85);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(226,226,185,.13);
+      border-radius: 16px;
+      padding: 40px 36px;
+      text-align: center;
+      box-shadow: 0 40px 100px rgba(0,0,0,.45);
+      animation: rise .4s ease both;
+    }
+    .auth-logo {
+      width: 64px; height: 64px;
+      background: linear-gradient(145deg, #356a70, #183438);
+      border-radius: 14px;
+      display: grid; place-items: center;
+      margin: 0 auto 22px;
+      box-shadow: inset 1px 1px 0 rgba(255,255,255,.1), 0 16px 40px rgba(0,0,0,.3);
+      color: #cfb66b;
+    }
+    .auth-card h1 { font-size: 28px; font-weight: 500; color: #E2E2B9; margin: 0 0 8px; }
+    .auth-card p { color: rgba(226,226,185,.65); font-size: 14px; line-height: 1.6; margin: 0 0 30px; }
+    .btn-google {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid rgba(226,226,185,.2);
+      border-radius: 10px;
+      background: rgba(255,255,255,.07);
+      color: #E2E2B9;
+      font-size: 15px;
+      font-weight: 500;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      cursor: pointer;
+      transition: background .2s, border-color .2s, transform .15s;
+    }
+    .btn-google:hover { background: rgba(255,255,255,.13); border-color: rgba(226,226,185,.4); transform: translateY(-1px); }
+    .btn-google:active { transform: translateY(0); }
+    .btn-google svg { flex-shrink: 0; }
+    .auth-footer { margin-top: 24px; color: rgba(226,226,185,.35); font-size: 11px; line-height: 1.6; }
+
+    /* User badge in sidebar */
+    .user-badge {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(255,255,255,.04);
+      cursor: default;
+      min-width: 0;
+    }
+    .user-avatar {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    .user-avatar-placeholder {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(145deg, #356a70, #29585E);
+      display: grid; place-items: center;
+      color: #cfb66b; font-size: 13px; font-weight: 700;
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    .user-name { font-size: 12px; color: rgba(247,240,227,.75); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-email { font-size: 10px; color: rgba(247,240,227,.4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-signout {
+      flex-shrink: 0; width: 26px; height: 26px; border: 0; border-radius: 6px;
+      background: rgba(255,255,255,.06); color: rgba(247,240,227,.5);
+      cursor: pointer; display: grid; place-items: center; margin-left: auto;
+      transition: background .15s, color .15s;
+    }
+    .btn-signout:hover { background: rgba(184,79,66,.25); color: #ff8b75; }
+    .btn-signout svg { width: 13px; height: 13px; stroke-width: 2; }
+
+    /* Sync indicator */
+    .sync-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--success); flex-shrink: 0;
+      transition: background .3s;
+    }
+    .sync-dot.syncing { background: var(--warning); animation: pulse-dot .8s ease infinite alternate; }
+    .sync-dot.error { background: var(--danger); }
+    @keyframes pulse-dot { from { opacity: .4; } to { opacity: 1; } }
+
+    /* Clickable metric cards */
+    .metric-clickable { cursor: pointer; transition: transform .15s, box-shadow .15s; position: relative; overflow: hidden; }
+    .metric-clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow), 0 0 0 2px var(--gold); }
+    .metric-clickable:active { transform: translateY(0); }
+
+    /* Quick filter chips */
+    .quick-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 20px; border: 1px solid var(--line);
+      background: var(--panel); color: var(--muted); cursor: pointer;
+      font-size: 12px; font-weight: 500; transition: all .15s; white-space: nowrap;
+    }
+    .quick-chip:hover { border-color: var(--gold); color: var(--gold); background: rgba(184,147,79,.06); }
+    .quick-chip.active { border-color: var(--gold); background: rgba(184,147,79,.14); color: var(--gold); font-weight: 600; }
+    .quick-chip i { width: 12px; height: 12px; }
+
+    .health[data-score="—"] { background: conic-gradient(rgba(127,127,127,.22) 100%, rgba(127,127,127,.22) 0); }
+    .health[data-score="—"]::before { color: var(--muted); font-size: 11px; font-weight: 600; }
+    .note-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 10px; }
+    /* ── Custom Date Picker ── */
+    .datepicker-wrap { position: relative; display: inline-block; width: 100%; }
+    .datepicker-input {
+      width: 100%; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--panel-solid); color: var(--text);
+      min-height: 38px; padding: 8px 36px 8px 10px; outline: 0; cursor: pointer;
+      user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .datepicker-input:focus, .datepicker-input.open { border-color: rgba(184,147,79,.6); box-shadow: 0 0 0 3px rgba(184,147,79,.12); }
+    .datepicker-icon {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      pointer-events: none; color: var(--muted); width:16px; height:16px;
+    }
+    .datepicker-pop {
+      position: fixed; z-index: 200;
+      width: 272px; background: var(--panel-solid); border: 1px solid var(--line);
+      border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.22); padding: 14px;
+      display: none;
+    }
+    .datepicker-pop.open { display: block; animation: rise .18s ease both; }
+    .dp-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .dp-nav-btn {
+      width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--panel); cursor: pointer; display: grid; place-items: center;
+      color: var(--text); transition: background .15s; font-size: 14px;
+    }
+    .dp-nav-btn:hover { background: var(--mint-2); }
+    .dp-month-label { font-weight: 600; font-size: 14px; color: var(--text); cursor: pointer; }
+    .dp-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-top:4px; }
+    .dp-dow {
+      text-align: center; font-size: 10px; font-weight: 600; color: var(--muted);
+      padding: 5px 0; text-transform: uppercase; letter-spacing: .06em;
+    }
+    .dp-day {
+      text-align: center; font-size: 12px; padding: 7px 2px; border-radius: 6px;
+      cursor: pointer; transition: background .12s, color .12s; color: var(--text);
+      border: 0; background: transparent; line-height: 1;
+    }
+    .dp-day:hover:not(.empty) { background: var(--mint-2); }
+    .dp-day.today { font-weight: 700; color: var(--mint); }
+    .dp-day.selected { background: linear-gradient(145deg, var(--gold-2), var(--gold)); color: #18130c; font-weight: 700; }
+    .dp-day.other-month { color: var(--faint); }
+    .dp-day.empty { cursor: default; pointer-events: none; }
+    .dp-footer { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
+      display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .dp-today-btn { font-size:12px; color:var(--mint); background:transparent; border:0; cursor:pointer; padding:4px 6px; border-radius:6px; }
+    .dp-today-btn:hover { background: var(--mint-2); }
+    .dp-clear-btn { font-size:12px; color:var(--muted); background:transparent; border:1px solid var(--line); cursor:pointer; padding:4px 8px; border-radius:6px; }
+    .dp-clear-btn:hover { color:var(--danger); border-color:var(--danger); }
+
+    /* ── Dynamic Project Tabs ── */
+    .proj-tabs-bar {
+      display: flex; align-items: stretch; gap: 0;
+      border-bottom: 1px solid var(--line); padding: 0 16px;
+      overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap;
+    }
+    .proj-tabs-bar::-webkit-scrollbar { display: none; }
+    .proj-tab {
+      padding: 10px 14px; border: 0; border-bottom: 2px solid transparent;
+      background: transparent; cursor: pointer; font-size: 13px;
+      color: var(--muted); white-space: nowrap; transition: color .16s, border-color .16s;
+      flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+    }
+    .proj-tab.active { border-bottom-color: var(--gold); color: var(--gold); font-weight: 600; }
+    .proj-tab:hover:not(.active) { color: var(--text); }
+    .proj-tab-del { font-size: 14px; opacity: .5; line-height: 1; }
+    .proj-tab-del:hover { opacity: 1; color: var(--danger); }
+    .proj-tab-add {
+      padding: 6px 10px; border: 1px dashed var(--line); border-radius: 8px;
+      background: transparent; cursor: pointer; font-size: 12px; color: var(--muted);
+      margin-left: 8px; white-space: nowrap; transition: border-color .15s, color .15s;
+      flex: 0 0 auto; align-self: center;
+    }
+    .proj-tab-add:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* ── Settings extras ── */
+    .settings-upload-zone {
+      border: 2px dashed var(--line); border-radius: 12px; padding: 20px;
+      text-align: center; cursor: pointer; transition: border-color .2s, background .2s;
+    }
+    .settings-upload-zone:hover, .settings-upload-zone.drag-over { border-color: var(--gold); background: rgba(184,147,79,.04); }
+    .logo-preview {
+      width: 52px; height: 52px; border-radius: 12px;
+      border: 1px solid var(--line); background: var(--panel);
+      margin: 0 auto 10px; display: grid; place-items: center; overflow: hidden;
+    }
+    .logo-preview img { width: 100%; height: 100%; object-fit: contain; }
+
+
+    @media (max-width: 1120px) {
+      .app { grid-template-columns: 82px minmax(0, 1fr); }
+      .brand-copy, .nav span, .sidebar-footer { display: none; }
+      .nav button { grid-template-columns: 1fr; justify-items: center; padding: 0; }
+      .brand { justify-content: center; }
+      .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-3, .wide-grid, .clarity-hero { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .app { display: block; }
+      .sidebar {
+        position: sticky;
+        z-index: 10;
+        height: auto;
+        padding: 10px;
+        flex-direction: row;
+        align-items: center;
+        overflow-x: auto;
+      }
+      .brand, .sidebar-footer { display: none; }
+      .nav { display: flex; gap: 6px; }
+      .nav span { display: inline; font-size: 11px; max-width: 72px; }
+      .nav button { width: auto; height: 42px; flex: 0 0 auto; grid-template-columns:18px auto; padding:0 10px; }
+      .main { padding: 16px 12px 28px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .actions { justify-content: flex-start; }
+      .grid-4, .grid-3, .grid-2, .form-grid { grid-template-columns: 1fr; }
+      .matrix { grid-template-columns: 1fr; }
+      .task-row { grid-template-columns: auto minmax(0, 1fr); }
+      .task-row > .pill { grid-column: 2; justify-self: start; }
+      .session-row { grid-template-columns: 72px minmax(0,1fr); }
+      .session-row .pill { grid-column: 2; justify-self: start; }
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+  <!-- ── Auth screen ─────────────────────────────────────────────────────── -->
+  <div id="authScreen">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+      </div>
+      <h1>Clarity</h1>
+      <p>Ваш особистий менеджер проєктів.<br>Увійдіть, щоб продовжити — дані зберігаються в хмарі.</p>
+      <button class="btn-google" id="googleSignInBtn">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Увійти через Google
+      </button>
+      <div class="auth-footer">
+        Дані синхронізуються через Firebase Firestore.<br>
+        Тільки ваш акаунт має доступ до ваших даних.
+      </div>
+    </div>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><i data-lucide="aperture"></i></div>
+        <div class="brand-copy">
+          <div class="brand-title">Clarity</div>
+          <div class="brand-subtitle">Personal project ecosystem</div>
+        </div>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="sidebar-footer" id="sidebarUserBlock">
+        <div class="user-badge">
+          <div class="user-avatar-placeholder" id="userAvatarFallback">?</div>
+          <div style="min-width:0;flex:1">
+            <div class="user-name" id="userName">—</div>
+            <div class="user-email" id="userEmail">—</div>
+          </div>
+          <div class="sync-dot" id="syncDot" title="Синхронізація"></div>
+          <button class="btn-signout" id="signOutBtn" title="Вийти">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;opacity:.45;line-height:1.5">
+          © 2025 Clarity · Made by <strong>Kovach</strong>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">The Clarity Board</h1>
+          <p id="pageSubtitle">Справи, проєкти, дедлайни та спокійний контроль над різними доменами.</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-ghost icon-btn" id="themeBtn" title="Змінити тему"><i data-lucide="moon"></i></button>
+          <button class="btn btn-primary" id="newTaskBtn"><i data-lucide="plus"></i> Нова задача</button>
+        </div>
+      </header>
+
+      <section class="page active" id="board"></section>
+      <section class="page" id="projects"></section>
+      <section class="page" id="analytics"></section>
+      <section class="page" id="matrix"></section>
+      <section class="page" id="special"></section>
+      <section class="page" id="notes"></section>
+      <section class="page" id="sessions"></section>
+      <section class="page" id="settings"></section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="projectModal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+    <div class="modal" style="width:min(900px,100%);max-height:min(800px,94vh)">
+      <div class="modal-head">
+        <strong id="projectModalTitle">Проєкт</strong>
+        <button class="btn icon-btn" data-close-project title="Закрити"><i data-lucide="x"></i></button>
+      </div>
+      <!-- Dynamic tab nav -->
+      <div class="proj-tabs-bar" id="projTabsBar">
+        <!-- rendered by JS -->
+      </div>
+      <!-- Static base panel always rendered, extra panels injected -->
+      <div id="projTabPanels" style="overflow:auto;max-height:calc(min(800px,94vh) - 160px)">
+        <div class="modal-content proj-tab-panel" data-panel="base">
+          <input type="hidden" id="projectId">
+          <div class="form-grid">
+            <div class="field">
+              <label for="projectTitle">Назва проєкту</label>
+              <input id="projectTitle" placeholder="Наприклад: Brand System 2025">
+            </div>
+            <div class="field">
+              <label for="projectDomain">Домен</label>
+              <select id="projectDomain"></select>
+            </div>
+            <div class="field">
+              <label for="projectStage">Поточний етап</label>
+              <input id="projectStage" placeholder="Prototype, Visual direction, Launch...">
+            </div>
+            <div class="field">
+              <label for="projectDue">Дедлайн</label>
+              <div class="datepicker-wrap" id="dpWrap_projectDue">
+                <button type="button" class="datepicker-input" id="projectDue" data-value="">
+                  <span class="dp-display">Оберіть дату</span>
+                </button>
+                <svg class="datepicker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/></svg>
+                <div class="datepicker-pop" id="dp_projectDue"></div>
+              </div>
+            </div>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label for="projectDescription">Опис / мета проєкту</label>
+            <textarea id="projectDescription" placeholder="Що саме створюємо, для кого, яка кінцева ціль?"></textarea>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label>Обкладинка (градієнт)</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end">
+              <div class="field"><label for="projectCoverA" style="font-size:11px">Колір А</label><input id="projectCoverA" type="color" value="#29585E"></div>
+              <div class="field"><label for="projectCoverB" style="font-size:11px">Колір Б</label><input id="projectCoverB" type="color" value="#E2E2B9"></div>
+              <div id="coverPreview" style="height:38px;border-radius:8px;border:1px solid var(--line);transition:background .2s"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Extra panels injected here -->
+        <div id="projExtraPanels"></div>
+      </div>
+      <div class="modal-foot" style="border-top:1px solid var(--line);border-bottom:0;justify-content:flex-end;padding:14px 16px;display:flex;gap:8px;align-items:center">
+        <button class="btn" type="button" data-close-project>Скасувати</button>
+        <button class="btn btn-primary" type="button" id="saveProjectBtn"><i data-lucide="save"></i> Зберегти</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="taskModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <strong id="modalTitle">Нова задача</strong>
+        <button class="btn icon-btn" data-close-modal title="Закрити"><i data-lucide="x"></i></button>
+      </div>
+      <form id="taskForm">
+        <div class="modal-content">
+          <input type="hidden" id="taskId">
+          <div class="form-grid">
+            <div class="field">
+              <label for="taskTitle">Назва задачі</label>
+              <input id="taskTitle" required placeholder="Наприклад: підготувати moodboard">
+            </div>
+            <div class="field">
+              <label for="taskProject">Проєкт</label>
+              <select id="taskProject"></select>
+            </div>
+            <div class="field">
+              <label for="taskDomain">Домен</label>
+              <select id="taskDomain">
+                <option>Дизайн</option>
+                <option>Партнери</option>
+                <option>Контент</option>
+                <option>Тури</option>
+                <option>Операції</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="taskDeadline">Дедлайн</label>
+              <div class="datepicker-wrap" id="dpWrap_taskDeadline">
+                <button type="button" class="datepicker-input" id="taskDeadline" data-value="">
+                  <span class="dp-display">Оберіть дату</span>
+                </button>
+                <svg class="datepicker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/></svg>
+                <div class="datepicker-pop" id="dp_taskDeadline"></div>
+              </div>
+            </div>
+            <div class="field">
+              <label for="taskUrgency">Терміновість</label>
+              <select id="taskUrgency">
+                <option value="high">Терміново</option>
+                <option value="low">Не терміново</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="taskImportance">Важливість</label>
+              <select id="taskImportance">
+                <option value="high">Важливо</option>
+                <option value="low">Не важливо</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="taskEstimate">Оцінка часу, год</label>
+              <input id="taskEstimate" type="number" min="0.25" step="0.25" value="1">
+            </div>
+            <div class="field">
+              <label for="taskStatus">Статус</label>
+              <select id="taskStatus">
+                <option value="open">Заплановано</option>
+                <option value="in_progress">В роботі</option>
+                <option value="blocked">Заблоковано</option>
+                <option value="on_hold">На паузі</option>
+                <option value="done">Виконано</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label for="taskNote">Нотатка</label>
+            <textarea id="taskNote" placeholder="Контекст, очікуваний результат, посилання"></textarea>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn" type="button" data-close-modal>Скасувати</button>
+          <button class="btn btn-primary" type="submit"><i data-lucide="save"></i> Зберегти</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ══════════════════════════════════════════════════════════════════════
+    // FIREBASE CONFIG  ← вставте сюди свій конфіг з Firebase Console
+    // ══════════════════════════════════════════════════════════════════════
+    const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyB38QwHXItXcQ79cWAI9EWN8kCtD49aTsk",
+  authDomain: "clarity-9c933.firebaseapp.com",
+  projectId: "clarity-9c933",
+  storageBucket: "clarity-9c933.firebasestorage.app",
+  messagingSenderId: "924546194409",
+  appId: "1:924546194409:web:2173f52906e330ff030978"
+    };
+    // ══════════════════════════════════════════════════════════════════════
+
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const fbAuth = firebase.auth();
+    const fbDb   = firebase.firestore();
+
+    let currentUser = null;   // set after sign-in
+    let unsubFirestore = null; // Firestore onSnapshot unsub
+
+    // ── Auth helpers ──────────────────────────────────────────────────────
+    function showAuthScreen(show) {
+      document.getElementById('authScreen').classList.toggle('hidden', !show);
+    }
+
+    function setUserBadge(user) {
+      const nameEl  = document.getElementById('userName');
+      const emailEl = document.getElementById('userEmail');
+      const avatar  = document.getElementById('userAvatarFallback');
+      if (!user) { nameEl.textContent = '—'; emailEl.textContent = '—'; avatar.textContent = '?'; return; }
+      nameEl.textContent  = user.displayName || 'Без імені';
+      emailEl.textContent = user.email || '';
+      avatar.textContent  = (user.displayName || user.email || '?')[0].toUpperCase();
+      // if user has photoURL — swap to <img>
+      if (user.photoURL) {
+        const img = document.createElement('img');
+        img.src = user.photoURL; img.alt = 'avatar'; img.className = 'user-avatar';
+        img.onerror = () => img.replaceWith(avatar);
+        avatar.replaceWith(img);
+      }
+    }
+
+    document.getElementById('googleSignInBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('googleSignInBtn');
+      btn.disabled = true; btn.textContent = 'Вхід…';
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await fbAuth.signInWithPopup(provider);
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Увійти через Google`;
+        showToast('Помилка входу: ' + err.message);
+      }
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', async () => {
+      if (!confirm('Вийти з акаунту?')) return;
+      if (unsubFirestore) { unsubFirestore(); unsubFirestore = null; }
+      await fbAuth.signOut();
+    });
+
+    // ── Firestore sync ────────────────────────────────────────────────────
+    function userDocRef(uid) {
+      return fbDb.collection('clarity_users').doc(uid);
+    }
+
+    function setSyncDot(status) { // 'ok' | 'syncing' | 'error'
+      const dot = document.getElementById('syncDot');
+      if (!dot) return;
+      dot.className = 'sync-dot' + (status === 'syncing' ? ' syncing' : status === 'error' ? ' error' : '');
+      dot.title = status === 'syncing' ? 'Збереження…' : status === 'error' ? 'Помилка збереження' : 'Синхронізовано';
+    }
+
+    async function saveStateToFirestore() {
+      if (!currentUser) { saveStateLocal(); return; }
+      setSyncDot('syncing');
+      try {
+        await userDocRef(currentUser.uid).set(
+          { ...state, _updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+          { merge: false }
+        );
+        setSyncDot('ok');
+        saveStateLocal(); // also keep local copy as fallback
+      } catch (err) {
+        console.error('Firestore save error:', err);
+        setSyncDot('error');
+        showToast('Помилка збереження: ' + err.message);
+        saveStateLocal();
+      }
+    }
+
+    function subscribeFirestore(uid) {
+      if (unsubFirestore) unsubFirestore();
+      setSyncDot('syncing');
+      unsubFirestore = userDocRef(uid).onSnapshot(doc => {
+        if (doc.exists) {
+          const data = doc.data();
+          delete data._updatedAt;
+          state = migrateState(data);
+          selectedProjectId = state.projects[0]?.id || null;
+          saveStateLocal();
+          render();
+          applyAppIdentity();
+          setSyncDot('ok');
+        } else {
+          // first time — write demo data
+          state = migrateState(demoState());
+          saveStateToFirestore();
+          render();
+          applyAppIdentity();
+        }
+      }, err => {
+        console.error('Firestore listen error:', err);
+        setSyncDot('error');
+        showToast('Помилка підключення до хмари. Дані збережено локально.');
+      });
+    }
+
+    // ── Auth state observer ───────────────────────────────────────────────
+    fbAuth.onAuthStateChanged(user => {
+      currentUser = user;
+      if (user) {
+        setUserBadge(user);
+        showAuthScreen(false);
+        subscribeFirestore(user.uid);
+      } else {
+        setUserBadge(null);
+        if (unsubFirestore) { unsubFirestore(); unsubFirestore = null; }
+        showAuthScreen(true);
+        // reset to empty/local state while signed out
+        state = migrateState(loadStateLocal());
+        render();
+        applyAppIdentity();
+      }
+    });
+
+    // ── Local storage (fallback / offline cache) ──────────────────────────
+    const STORAGE_KEY = 'clarity_spa_state_v1';
+
+    function loadStateLocal() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        return saved || demoState();
+      } catch { return demoState(); }
+    }
+
+    function saveStateLocal() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+    }
+
+    // ── Public saveState used throughout the app ──────────────────────────
+    function loadState() { return loadStateLocal(); }
+
+    function saveState() {
+      saveStateToFirestore();
+    }
+
+    const routes = [
+      ['board', 'layout-dashboard', 'The Clarity Board', 'Справи, проєкти, дедлайни та спокійний контроль над різними доменами.'],
+      ['projects', 'folder-kanban', 'Проєкти', 'Health Score, обкладинки, домени й прогрес кожного напрямку.'],
+      ['analytics', 'chart-no-axes-combined', 'Аналітика', 'Розподіл часу, тижнева продуктивність і загальна статистика.'],
+      ['matrix', 'panel-top', 'Матриця пріоритетів', 'Розділення задач за терміновістю та важливістю.'],
+      ['special', 'sliders-horizontal', 'Special Specs', 'Тур-метадані, технічні параметри дизайну та чек-листи.'],
+      ['notes', 'images', 'Нотатки й референси', 'Мудборди, прив’язка до етапів та візуальні посилання.'],
+      ['sessions', 'calendar-check', 'Clarity Sessions', 'Щотижневе планування, перегляд пріоритетів і рішень.'],
+      ['settings', 'settings', 'Налаштування', 'Домени, палітра та базові параметри системи.']
+    ];
+
+    const todayISO = () => new Date().toISOString().slice(0, 10);
+    const addDays = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    const uid = () => Math.random().toString(36).slice(2, 9);
+
+    const demoState = () => ({
+      projects: [
+        {
+          id: 'p-design',
+          title: 'Brand System: Gold Leaf Collection',
+          domain: 'Дизайн',
+          cover: 'linear-gradient(135deg, #201c18, #b8934f)',
+          stage: 'Visual direction',
+          due: addDays(6),
+          description: 'Айдентика, друковані макети, premium moodboard і підготовка файлів для Affinity.',
+          specs: { size: 'A3 / 300 DPI', color: 'CMYK FOGRA39', affinity: 'Publisher + Designer', print: 'Gold foil, embossing' }
+        },
+        {
+          id: 'p-tour',
+          title: 'Tour Product: Adriatic Slow Travel',
+          domain: 'Тури',
+          cover: 'linear-gradient(135deg, #0e3c45, #8acdb4)',
+          stage: 'Partner negotiation',
+          due: addDays(12),
+          description: 'Пакет на 10 днів із готелями, умовами ануляції, заставами та партнерськими дедлайнами.',
+          tour: { pledgeType: '30% депозит', cancellation: 'Без штрафу до 21 дня', dates: '12–22 червня', checklist: 'Готелі, трансфери, ваучери, страховки' }
+        },
+        {
+          id: 'p-product',
+          title: 'Product Design: Client Portal',
+          domain: 'Продукт',
+          cover: 'linear-gradient(135deg, #24252d, #5f7ea7)',
+          stage: 'Prototype',
+          due: addDays(18),
+          description: 'Інтерфейс для клієнтського кабінету: сценарії, wireframes, інтерактивний прототип.'
+        }
+      ],
+      domains: [
+        { id: 'design', name: 'Дизайн', color: '#E2E2B9' },
+        { id: 'partners', name: 'Партнери', color: '#78c0aa' },
+        { id: 'content', name: 'Контент', color: '#cfb66b' },
+        { id: 'tours', name: 'Тури', color: '#5d8f95' },
+        { id: 'operations', name: 'Операції', color: '#29585E' },
+        { id: 'product', name: 'Продукт', color: '#7f9fa4' }
+      ],
+      tasks: [
+        { id: uid(), title: 'Підготувати moodboard: gold leaf / cinematic lighting', projectId: 'p-design', domain: 'Дизайн', deadline: todayISO(), urgency: 'high', importance: 'high', estimate: 2, status: 'open', note: 'Зібрати 12 референсів і 3 варіанти типографіки.', completedAt: null },
+        { id: uid(), title: 'Перевірити умови ануляції з партнерами', projectId: 'p-tour', domain: 'Партнери', deadline: addDays(-1), urgency: 'high', importance: 'high', estimate: 1.5, status: 'open', note: 'Оновити таблицю умов для турів.', completedAt: null },
+        { id: uid(), title: 'Затвердити структуру Client Portal', projectId: 'p-product', domain: 'Продукт', deadline: addDays(2), urgency: 'low', importance: 'high', estimate: 3, status: 'open', note: 'Після цього переходити до прототипу.', completedAt: null },
+        { id: uid(), title: 'Експортувати друковані макети у CMYK', projectId: 'p-design', domain: 'Дизайн', deadline: addDays(4), urgency: 'low', importance: 'high', estimate: 2.5, status: 'open', note: 'Перевірити bleed і profile.', completedAt: null },
+        { id: uid(), title: 'Написати контент для сторінки туру', projectId: 'p-tour', domain: 'Контент', deadline: addDays(1), urgency: 'high', importance: 'low', estimate: 1, status: 'open', note: 'Коротко, преміально, без перевантаження.', completedAt: null },
+        { id: uid(), title: 'Закрити ревізію календаря сесій', projectId: 'p-product', domain: 'Операції', deadline: addDays(-3), urgency: 'low', importance: 'low', estimate: 1, status: 'done', note: 'Виконано під час минулої сесії.', completedAt: addDays(-2) },
+        { id: uid(), title: 'Провести ретро по задачах дизайну', projectId: 'p-design', domain: 'Дизайн', deadline: addDays(-5), urgency: 'low', importance: 'high', estimate: 1, status: 'done', note: 'Зафіксувати рішення.', completedAt: addDays(-4) }
+      ],
+      notes: [
+        { id: uid(), title: 'Gold leaf references', projectId: 'p-design', stage: 'Visual direction', url: 'https://www.pinterest.com/search/pins/?q=gold%20leaf%20branding', text: 'Фактури золота, тонкий embossing, багато повітря.' },
+        { id: uid(), title: 'Cinematic lighting', projectId: 'p-design', stage: 'Moodboard', url: 'https://www.behance.net/search/projects/cinematic%20lighting%20branding', text: 'Глибокі тіні, теплий контраст, акцент на матеріалах.' },
+        { id: uid(), title: 'Slow travel copy tone', projectId: 'p-tour', stage: 'Content', url: 'https://www.nationalgeographic.com/travel', text: 'Спокійна, предметна мова без рекламного шуму.' }
+      ],
+      sessions: [
+        { id: uid(), date: addDays(3), title: 'Weekly Clarity Session', focus: 'Вирівняти дизайн-спеки й тур-дедлайни', result: 'Заплановано' },
+        { id: uid(), date: addDays(10), title: 'Priority Review', focus: 'Перевірка Health Score і ризиків', result: 'Заплановано' }
+      ]
+    });
+
+    let state = migrateState(loadState());
+    let selectedProjectId = state.projects[0]?.id || null;
+    let boardFilters = { query: '', domain: 'all', projectId: 'all', status: 'active', quickFilter: 'active', showAll: false, showAdvanced: false };
+    let toastQueue = [];
+    let toastShowing = false;
+
+    function migrateState(data) {
+      const next = data || demoState();
+      if (!Array.isArray(next.domains)) next.domains = demoState().domains;
+      next.projects ||= [];
+      next.tasks ||= [];
+      next.notes ||= [];
+      next.sessions ||= [];
+      next.tasks.forEach(task => {
+        if (!['open', 'in_progress', 'blocked', 'on_hold', 'done'].includes(task.status)) task.status = task.done ? 'done' : 'open';
+      });
+      // restore custom status labels
+      if (next.statusLabels) {
+        Object.entries(next.statusLabels).forEach(([key, label]) => { if (STATUS_CONFIG[key]) STATUS_CONFIG[key].label = label; });
+      }
+      return next;
+    }
+
+    function projectById(id) {
+      return state.projects.find(p => p.id === id) || { title: 'Без проєкту', domain: 'Операції' };
+    }
+
+    function computeProjectHealth(project) {
+      const related = state.tasks.filter(t => t.projectId === project.id);
+      if (!related.length) return null;
+      const done = related.filter(t => t.status === 'done').length;
+      const overdue = related.filter(t => t.status !== 'done' && t.deadline < todayISO()).length;
+      const blocked = related.filter(t => t.status === 'blocked').length;
+      const inProgress = related.filter(t => t.status === 'in_progress').length;
+      const completion = done / related.length * 100;
+      const momentum = inProgress / related.length * 12;
+      const riskPenalty = overdue / related.length * 45 + blocked / related.length * 25;
+      return Math.max(0, Math.min(100, Math.round(completion + momentum - riskPenalty)));
+    }
+
+    function healthLabel(h) {
+      if (h === null) return '—';
+      return h + '%';
+    }
+    function healthClass(h) {
+      if (h === null) return 'warning';
+      return h < 55 ? 'danger' : h < 75 ? 'warning' : 'mint';
+    }
+
+    function appStats() {
+      const tasks = state.tasks;
+      const open = tasks.filter(t => t.status !== 'done');
+      const today = open.filter(t => t.deadline === todayISO());
+      const overdue = open.filter(t => t.deadline < todayISO());
+      const doneToday = tasks.filter(t => t.status === 'done' && t.completedAt === todayISO());
+      let pure;
+      if (!open.length) {
+        pure = 100;
+      } else if (overdue.length === 0 && today.length === 0) {
+        pure = 100;
+      } else {
+        pure = Math.max(0, Math.round((doneToday.length / Math.max(today.length + doneToday.length, 1)) * 100) - overdue.length * 15);
+      }
+      return { tasks, open, today, overdue, doneToday, pure };
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso + 'T12:00:00');
+      return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+    }
+
+    function renderNav() {
+      document.getElementById('nav').innerHTML = routes.map(([id, icon, title]) => `
+        <button data-route="${id}" title="${title}" class="${id === currentRoute() ? 'active' : ''}">
+          <i data-lucide="${icon}"></i><span>${title}</span>
+        </button>
+      `).join('');
+      document.querySelectorAll('[data-route]').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.route)));
+    }
+
+    function currentRoute() {
+      return location.hash.replace('#', '') || 'board';
+    }
+
+    function navigate(route) {
+      if (!routes.some(r => r[0] === route)) route = 'board';
+      location.hash = route;
+      render();
+    }
+
+    function setHeader(route) {
+      const item = routes.find(r => r[0] === route) || routes[0];
+      document.getElementById('pageTitle').textContent = item[2];
+      document.getElementById('pageSubtitle').textContent = item[3];
+    }
+
+    function render() {
+      const route = currentRoute();
+      document.querySelectorAll('.page').forEach(page => page.classList.toggle('active', page.id === route));
+      setHeader(route);
+      renderNav();
+      renderTaskProjectOptions();
+      renderCurrentRoute(route);
+      requestAnimationFrame(() => {
+        document.querySelectorAll('.progress > span').forEach(el => el.style.width = el.dataset.width);
+        renderIcons();
+      });
+    }
+
+    function renderCurrentRoute(route = currentRoute()) {
+      const renderers = {
+        board: renderBoard,
+        projects: renderProjects,
+        analytics: renderAnalytics,
+        matrix: renderMatrix,
+        special: renderSpecial,
+        notes: renderNotes,
+        sessions: renderSessions,
+        settings: renderSettings
+      };
+      (renderers[route] || renderBoard)();
+    }
+
+    function rerenderActive() {
+      saveState();
+      renderCurrentRoute();
+      renderNav();
+      renderTaskProjectOptions();
+      requestAnimationFrame(() => {
+        document.querySelectorAll('.progress > span').forEach(el => el.style.width = el.dataset.width);
+        renderIcons();
+      });
+    }
+
+    function renderBoard() {
+      const stats = appStats();
+      const activeProjects = state.projects.length;
+      const healthValues = state.projects.map(p => computeProjectHealth(p)).filter(h => h !== null);
+      const avgHealth = healthValues.length ? Math.round(healthValues.reduce((s, h) => s + h, 0) / healthValues.length) : null;
+      const visibleTasks = filteredTasks();
+      const hiddenCount = Math.max(0, visibleTasks.length - 8);
+      document.getElementById('board').innerHTML = `
+        <div class="clarity-hero">
+          <div class="card clarity-panel">
+            <div class="eyebrow">The Clarity Board</div>
+            <h2>${stats.pure === 100 ? 'Pure Clarity. Сьогодні все закрито.' : 'Фокус без хаосу. Видно, що горить і що рухає систему.'}</h2>
+            <p>Єдина панель для графічного дизайну, продуктових задач і туристичних продуктів: дедлайни, здоров’я проєктів, пріоритети та референси в одному місці.</p>
+          </div>
+          <div class="card pure-clarity">
+            <div class="pure-ring" style="--pct:${stats.pure}" data-value="${stats.pure}%"></div>
+            <strong>Pure Clarity</strong>
+            <div class="muted tiny" style="margin-top:6px">${stats.overdue.length ? `${stats.overdue.length} прострочено` : 'Стан дня стабільний'}</div>
+          </div>
+        </div>
+
+        <div class="grid grid-4" style="margin-bottom:16px">
+          ${metric('folder-check', activeProjects, 'Активні проєкти', 'Дизайн, тури, продукт', "setBoardFilter(\'status\',\'active\')")}
+          ${metric('activity', avgHealth !== null ? avgHealth + '%' : '—', 'Середній Health Score', avgHealth !== null ? 'Виконання мінус ризики' : 'Немає задач у проєктах')}
+          ${metric('calendar-clock', stats.today.length, 'Задачі на сьогодні', stats.today.length ? 'Потребують уваги' : 'Список чистий', "applyQuickFilter(\'today\')")}
+          ${metric('triangle-alert', stats.overdue.length, 'Прострочені дедлайни', stats.overdue.length ? 'Є ризики' : 'Без критичних боргів', "applyQuickFilter(\'overdue\')")}
+        </div>
+
+        <div class="grid wide-grid">
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <div class="eyebrow">Today</div>
+                <h2 class="card-title">Операційний список</h2>
+              </div>
+              <button class="btn btn-ghost" onclick="openTaskModal()"><i data-lucide="plus"></i> Додати</button>
+            </div>
+            <!-- Quick-filter chips -->
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+              ${[
+                { key:'active',      label:'Усі активні',      icon:'list' },
+                { key:'today',       label:'Сьогодні',         icon:'sun' },
+                { key:'overdue',     label:'Прострочені',      icon:'triangle-alert' },
+                { key:'in_progress', label:'В роботі',         icon:'zap' },
+                { key:'blocked',     label:'Заблоковано',      icon:'ban' },
+                { key:'done',        label:'Виконано',         icon:'check-circle-2' },
+                { key:'all',         label:'Усі задачі',       icon:'layers' },
+              ].map(f => `<button class="quick-chip${boardFilters.quickFilter===f.key ? ' active' : ''}" onclick="applyQuickFilter('${f.key}')"><i data-lucide="${f.icon}"></i>${f.label}</button>`).join('')}
+            </div>
+            <!-- Advanced filters (collapsed by default) -->
+            <div id="advFiltersRow" style="display:${boardFilters.showAdvanced ? '' : 'none'};margin-bottom:10px">
+              <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;margin-bottom:0">
+                <input placeholder="Пошук задачі" value="${escapeHTML(boardFilters.query)}" oninput="setBoardFilter('query', this.value)">
+                <select onchange="setBoardFilter('domain', this.value)">
+                  <option value="all">Усі домени</option>
+                  ${state.domains.map(d => `<option value="${escapeHTML(d.name)}" ${boardFilters.domain === d.name ? 'selected' : ''}>${escapeHTML(d.name)}</option>`).join('')}
+                </select>
+                <select onchange="setBoardFilter('projectId', this.value)">
+                  <option value="all">Усі проєкти</option>
+                  ${state.projects.map(p => `<option value="${p.id}" ${boardFilters.projectId === p.id ? 'selected' : ''}>${escapeHTML(p.title)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+              <button class="btn btn-ghost" style="font-size:12px;padding:4px 10px" onclick="boardFilters.showAdvanced=!boardFilters.showAdvanced;renderBoard();renderIcons()">
+                <i data-lucide="sliders-horizontal"></i> ${boardFilters.showAdvanced ? 'Сховати фільтри' : 'Розширені фільтри'}
+              </button>
+              ${(boardFilters.query || boardFilters.domain!=='all' || boardFilters.projectId!=='all') ? `<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;color:var(--muted)" onclick="clearAdvFilters()"><i data-lucide="x"></i> Скинути</button>` : ''}
+              <span class="muted tiny" style="margin-left:auto">${visibleTasks.length} задач</span>
+            </div>
+            ${taskListHTML((boardFilters.showAll ? visibleTasks : visibleTasks.slice(0, 8)))}
+            ${hiddenCount && !boardFilters.showAll ? `<button class="btn" style="width:100%;margin-top:8px" onclick="boardFilters.showAll=true; renderBoard(); renderIcons()">Показано 8 із ${visibleTasks.length}. Показати всі</button>` : ''}
+          </div>
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <div class="eyebrow">Focus</div>
+                <h2 class="card-title">Пріоритет тижня</h2>
+              </div>
+            </div>
+            ${state.projects.map(projectFocusHTML).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function metric(icon, value, label, note, onclick = '') {
+      const clickable = onclick ? `onclick="${onclick}" role="button" tabindex="0" style="cursor:pointer"` : '';
+      const ring = onclick ? `<div class="metric-click-ring"></div>` : '';
+      return `
+        <div class="card metric${onclick ? ' metric-clickable' : ''}" ${clickable}>
+          <div style="display:flex;justify-content:space-between;gap:12px">
+            <div class="metric-label">${label}</div>
+            <div class="metric-icon"><i data-lucide="${icon}"></i></div>
+          </div>
+          <div>
+            <div class="metric-value">${value}</div>
+            <div class="metric-label" style="margin-top:7px">${note}</div>
+          </div>
+          ${ring}
+        </div>
+      `;
+    }
+
+    function taskListHTML(tasks) {
+      if (!tasks.length) return `<div class="note-card"><h3>Pure Clarity</h3><p class="muted">Немає відкритих задач. Можна планувати наступний крок спокійно.</p></div>`;
+      return tasks.map(taskHTML).join('');
+    }
+
+    const STATUS_CONFIG = {
+      open: { label: 'Заплановано', cls: 'gold' },
+      in_progress: { label: 'В роботі', cls: 'mint' },
+      blocked: { label: 'Заблоковано', cls: 'danger' },
+      on_hold: { label: 'На паузі', cls: 'warning' },
+      done: { label: 'Виконано', cls: 'mint' }
+    };
+
+    function filteredTasks() {
+      const query = boardFilters.query.trim().toLowerCase();
+      const qf = boardFilters.quickFilter;
+      return state.tasks
+        .filter(task => {
+          if (qf === 'today')   return task.status !== 'done' && task.deadline === todayISO();
+          if (qf === 'overdue') return task.status !== 'done' && task.deadline < todayISO();
+          if (qf === 'active')  return task.status !== 'done';
+          if (qf === 'all')     return true;
+          return task.status === qf;
+        })
+        .filter(task => boardFilters.domain === 'all' || task.domain === boardFilters.domain)
+        .filter(task => boardFilters.projectId === 'all' || task.projectId === boardFilters.projectId)
+        .filter(task => !query || `${task.title} ${task.note || ''} ${projectById(task.projectId).title}`.toLowerCase().includes(query))
+        .sort((a, b) => a.deadline.localeCompare(b.deadline));
+    }
+
+    function applyQuickFilter(key) {
+      boardFilters.quickFilter = key;
+      boardFilters.showAll = false;
+      renderBoard();
+      requestAnimationFrame(renderIcons);
+      // Scroll task list into view
+      const el = document.getElementById('board');
+      if (el) el.querySelector('.card.pad')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function clearAdvFilters() {
+      boardFilters.query = '';
+      boardFilters.domain = 'all';
+      boardFilters.projectId = 'all';
+      boardFilters.showAll = false;
+      renderBoard();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function setBoardFilter(key, value) {
+      boardFilters[key] = value;
+      boardFilters.showAll = false;
+      renderBoard();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function taskHTML(task) {
+      const project = projectById(task.projectId);
+      const overdue = task.status !== 'done' && task.deadline < todayISO();
+      const cfg = STATUS_CONFIG[task.status] || STATUS_CONFIG.open;
+      const statusClass = overdue ? 'danger' : cfg.cls;
+      const isDone = task.status === 'done';
+      return `
+        <div class="task-row">
+          <button class="check ${isDone ? 'done' : ''}" onclick="toggleTask('${task.id}')" title="${isDone ? 'Повернути в роботу' : 'Позначити виконаною'}">
+            ${isDone ? '<i data-lucide="check"></i>' : ''}
+          </button>
+          <div>
+            <div class="task-title">${escapeHTML(task.title)}</div>
+            <div class="task-meta">
+              <span>${escapeHTML(project.title)}</span>
+              <span>${escapeHTML(task.domain)}</span>
+              <span>${task.estimate} год</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+            <span class="pill ${statusClass}">${overdue ? 'Прострочено' : cfg.label} · ${formatDate(task.deadline)}</span>
+            <button class="btn icon-btn" onclick="openTaskModal('${task.id}')" title="Редагувати задачу"><i data-lucide="sliders-horizontal"></i></button>
+            <button class="btn icon-btn btn-danger" onclick="deleteTask('${task.id}')" title="Видалити задачу"><i data-lucide="trash-2"></i></button>
+          </div>
+        </div>
+      `;
+    }
+
+    function projectFocusHTML(project) {
+      const health = computeProjectHealth(project);
+      const related = state.tasks.filter(t => t.projectId === project.id);
+      const done = related.filter(t => t.status === 'done').length;
+      const progress = Math.round(done / Math.max(related.length, 1) * 100);
+      return `
+        <div style="margin-bottom:15px">
+          <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:8px">
+            <div>
+              <strong style="font-size:13px">${project.title}</strong>
+              <div class="muted tiny">${project.stage} · ${project.domain}</div>
+            </div>
+            <span class="pill ${healthClass(health)}">${healthLabel(health)}</span>
+          </div>
+          <div class="progress"><span data-width="${progress}%"></span></div>
+        </div>
+      `;
+    }
+
+    function renderProjects() {
+      const selected = state.projects.find(p => p.id === selectedProjectId) || state.projects[0];
+      if (selected && selectedProjectId !== selected.id) selectedProjectId = selected.id;
+
+      const emptyState = !state.projects.length ? `
+        <div class="note-card" style="text-align:center;padding:32px">
+          <h3>Проєктів ще немає</h3>
+          <p class="muted">Натисніть «Новий проєкт», щоб розпочати.</p>
+        </div>` : '';
+
+      document.getElementById('projects').innerHTML = `
+        <div class="card pad" style="margin-bottom:16px">
+          <div class="card-header">
+            <div>
+              <div class="eyebrow">Projects</div>
+              <h2 class="card-title">Натисніть на картку, щоб відкрити деталі</h2>
+            </div>
+            <button class="btn btn-primary" onclick="openProjectModal()"><i data-lucide="plus"></i> Новий проєкт</button>
+          </div>
+        </div>
+        ${emptyState}
+        <div class="projects-grid">
+          ${state.projects.map(p => {
+            const isActive = p.id === selected?.id;
+            const health = computeProjectHealth(p);
+            const tasks = state.tasks.filter(t => t.projectId === p.id);
+            const done = tasks.filter(t => t.status === 'done').length;
+            const progress = Math.round(done / Math.max(tasks.length, 1) * 100);
+            const stateClass = isActive ? 'is-active' : 'is-inactive';
+            return `
+              <article class="card project-card ${stateClass}" onclick="openProject('${p.id}')">
+                <div class="cover" style="background:${p.cover}"></div>
+                <div class="project-body">
+                  <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+                    <div>
+                      <span class="pill gold">${escapeHTML(p.domain)}</span>
+                      <h3>${escapeHTML(p.title)}</h3>
+                    </div>
+                    <div class="health" style="--score:${health !== null ? health + '%' : '0%'}" data-score="${health !== null ? health + '%' : '—'}" title="${health === null ? 'Немає задач — Health Score не розраховано' : 'Health Score: ' + health + '%'}"></div>
+                  </div>
+                  <p class="muted tiny" style="line-height:1.55">${escapeHTML(p.description || '')}</p>
+                  <div class="progress"><span data-width="${progress}%"></span></div>
+                  <div class="task-meta" style="margin-top:10px">
+                    <span>${escapeHTML(p.stage || '—')}</span>
+                    <span>дедлайн ${p.due ? formatDate(p.due) : '—'}</span>
+                    <span>${tasks.length} задач</span>
+                  </div>
+                </div>
+              </article>
+            `;
+          }).join('')}
+        </div>
+        ${selected ? projectDetailHTML(selected) : ''}
+      `;
+    }
+
+    function projectDetailHTML(project) {
+      const health = computeProjectHealth(project);
+      const tasks = state.tasks.filter(t => t.projectId === project.id);
+      const notes = state.notes.filter(n => n.projectId === project.id);
+      return `
+        <div class="detail-panel" id="projectDetail">
+          <div class="card-header">
+            <div>
+              <div class="eyebrow">Project Detail</div>
+              <h2 class="card-title">${escapeHTML(project.title)}</h2>
+              <p class="muted tiny" style="line-height:1.6">${escapeHTML(project.description || '')}</p>
+            </div>
+            <div class="actions">
+              <span class="pill ${healthClass(health)}">Health ${healthLabel(health)}</span>
+              <button class="btn" onclick="openProjectModal('${project.id}')"><i data-lucide="sliders-horizontal"></i> Редагувати</button>
+              <button class="btn" onclick="openTaskModal('', '${project.id}')"><i data-lucide="plus"></i> Задача</button>
+              <button class="btn btn-danger icon-btn" onclick="deleteProject('${project.id}')" title="Видалити проєкт"><i data-lucide="trash-2"></i></button>
+            </div>
+          </div>
+          <div class="grid grid-3">
+            <div class="note-card"><span class="muted tiny">Домен</span><h3>${escapeHTML(project.domain)}</h3></div>
+            <div class="note-card"><span class="muted tiny">Етап</span><h3>${escapeHTML(project.stage || 'Не задано')}</h3></div>
+            <div class="note-card"><span class="muted tiny">Дедлайн</span><h3>${project.due ? formatDate(project.due) : 'Не задано'}</h3></div>
+          </div>
+          <div class="grid grid-2" style="margin-top:14px">
+            <div>
+              <h3 class="card-title" style="margin-bottom:10px">Задачі проєкту (${tasks.length})</h3>
+              ${tasks.length ? taskListHTML(tasks) : '<div class="muted tiny">Задач ще немає. Натисніть «+ Задача» вище.</div>'}
+            </div>
+            <div>
+              <h3 class="card-title" style="margin-bottom:10px">Нотатки й референси (${notes.length})</h3>
+              ${notes.length ? notes.map(n => `
+                <div class="mini-task" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                  <div><strong>${escapeHTML(n.title)}</strong><div class="muted tiny">${escapeHTML(n.stage)}${n.url ? ` · <a href="${escapeHTML(n.url)}" target="_blank" rel="noreferrer noopener" style="color:var(--gold)">посилання</a>` : ''}</div></div>
+                  <button class="btn icon-btn btn-danger" onclick="deleteNote('${n.id}')" title="Видалити нотатку"><i data-lucide="trash-2"></i></button>
+                </div>`).join('') : '<div class="muted tiny">Нотаток поки немає. Додайте на сторінці «Нотатки».</div>'}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function openProject(id) {
+      selectedProjectId = id;
+      if (currentRoute() !== 'projects') location.hash = 'projects';
+      rerenderActive();
+    }
+
+    function renderAnalytics() {
+      const domainTotals = state.tasks.reduce((acc, t) => {
+        acc[t.domain] = (acc[t.domain] || 0) + Number(t.estimate || 0);
+        return acc;
+      }, {});
+      const chartColors = ['#E2E2B9', '#78c0aa', '#cfb66b', '#5d8f95', '#b84f42', '#a88c4a', '#9ad2bc'];
+      const domainKeys = Object.keys(domainTotals);
+      const domainVals = Object.values(domainTotals);
+      const totalH = domainVals.reduce((s, v) => s + v, 0);
+
+      document.getElementById('analytics').innerHTML = `
+        <div class="grid grid-2">
+          <div class="card pad">
+            <div class="card-header"><div><div class="eyebrow">Domains</div><h2 class="card-title">Розподіл часу між доменами</h2></div></div>
+            <div style="display:flex;align-items:center;gap:24px;padding-top:12px;flex-wrap:wrap">
+              <div style="flex:0 0 190px">
+                <canvas id="domainChart" style="width:190px;height:190px;display:block"></canvas>
+              </div>
+              <div style="flex:1;min-width:140px">
+                ${!domainKeys.length ? '<p class="muted tiny">Немає задач з оцінкою часу.</p>' :
+                  domainKeys.map((key, i) => `
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                      <span style="width:12px;height:12px;border-radius:3px;background:${chartColors[i % chartColors.length]};flex:0 0 12px;display:inline-block"></span>
+                      <span style="font-size:13px;color:var(--text)">${escapeHTML(key)}</span>
+                      <span class="muted tiny" style="margin-left:auto;white-space:nowrap">${domainVals[i]} год</span>
+                    </div>`).join('')
+                }
+                ${totalH ? `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px;font-size:13px;font-weight:600">Разом: ${totalH} год</div>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="card pad">
+            <div class="card-header"><div><div class="eyebrow">Week</div><h2 class="card-title">Тижнева продуктивність</h2></div></div>
+            <canvas id="weekChart"></canvas>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <div class="eyebrow" style="margin-bottom:8px">Здоров'я проєктів</div>
+          <div class="grid grid-3">
+            ${state.projects.map(p => { const h = computeProjectHealth(p); return metric('heart-pulse', healthLabel(h), p.title, h === null ? 'Немає задач' : 'Health Score'); }).join('')}
+          </div>
+        </div>
+      `;
+      setTimeout(() => {
+        drawDoughnutChart(domainKeys, domainVals, chartColors);
+        drawCharts();
+      }, 0);
+    }
+
+    function drawDoughnutChart(labels, values, colors) {
+      const canvas = document.getElementById('domainChart');
+      if (!canvas || !values.length) return;
+      const scale = window.devicePixelRatio || 1;
+      const size = 190;
+      canvas.width = size * scale;
+      canvas.height = size * scale;
+      canvas.style.width = size + 'px';
+      canvas.style.height = size + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      const total = values.reduce((s, v) => s + v, 0) || 1;
+      const cx = size / 2, cy = size / 2, r = 72, lw = 30;
+      let angle = -Math.PI / 2;
+      ctx.lineWidth = lw;
+      values.forEach((v, i) => {
+        const slice = v / total * Math.PI * 2;
+        ctx.beginPath();
+        ctx.strokeStyle = colors[i % colors.length];
+        ctx.arc(cx, cy, r, angle, angle + slice);
+        ctx.stroke();
+        angle += slice;
+      });
+      // Center hole
+      ctx.beginPath();
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--panel-solid').trim();
+      ctx.arc(cx, cy, r - lw / 2 - 1, 0, Math.PI * 2);
+      ctx.fill();
+      // Center label
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim();
+      ctx.font = '700 20px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(Math.round(total) + 'h', cx, cy);
+    }
+
+    function drawCharts() {
+      const weekCanvas = document.getElementById('weekChart');
+      if (!weekCanvas) return;
+      const days = Array.from({ length: 7 }, (_, i) => addDays(i - 6));
+      const counts = days.map(day => state.tasks.filter(t => t.completedAt === day).length);
+      drawBars(weekCanvas, days.map(formatDate), counts);
+    }
+
+    function setupCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      canvas.width = Math.max(320, Math.floor(rect.width * scale));
+      canvas.height = Math.floor(290 * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      return { ctx, width: canvas.width / scale, height: canvas.height / scale };
+    }
+
+    function cssVar(name) {
+      return getComputedStyle(document.body).getPropertyValue(name).trim();
+    }
+
+    // drawDoughnut replaced by drawDoughnutChart (HTML legend)
+
+    function drawBars(canvas, labels, values) {
+      const { ctx, width, height } = setupCanvas(canvas);
+      const pad = { top: 24, right: 18, bottom: 46, left: 32 };
+      const chartW = width - pad.left - pad.right;
+      const chartH = height - pad.top - pad.bottom;
+      const max = Math.max(...values, 1);
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = 'rgba(128,128,128,.16)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 3; i++) {
+        const y = pad.top + chartH / 3 * i;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(width - pad.right, y);
+        ctx.stroke();
+      }
+      const gap = 11;
+      const barW = (chartW - gap * (values.length - 1)) / values.length;
+      values.forEach((value, index) => {
+        const h = value / max * chartH;
+        const x = pad.left + index * (barW + gap);
+        const y = pad.top + chartH - h;
+        const grad = ctx.createLinearGradient(0, y, 0, pad.top + chartH);
+        grad.addColorStop(0, '#E2E2B9');
+        grad.addColorStop(1, '#78c0aa');
+        roundRect(ctx, x, y, barW, h || 3, 7);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.fillStyle = cssVar('--muted');
+        ctx.font = '11px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(labels[index], x + barW / 2, height - 18);
+      });
+    }
+
+    function roundRect(ctx, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + width, y, x + width, y + height, r);
+      ctx.arcTo(x + width, y + height, x, y + height, r);
+      ctx.arcTo(x, y + height, x, y, r);
+      ctx.arcTo(x, y, x + width, y, r);
+      ctx.closePath();
+    }
+
+    function renderIcons() {
+      const icons = {
+        aperture: '<circle cx="12" cy="12" r="9"/><path d="M14.5 3.4 12 12l6.8-5"/><path d="M21 12h-9l5.4 6.8"/><path d="M14.5 20.6 12 12l-6.8 5"/><path d="M3 12h9L6.6 5.2"/>',
+        sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8z"/><path d="M19 2l.8 2.2L22 5l-2.2.8L19 8l-.8-2.2L16 5l2.2-.8z"/>',
+        moon: '<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5 7 7 0 1 0 20.5 14.5z"/>',
+        plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+        x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+        save: '<path d="M5 3h12l2 2v16H5z"/><path d="M8 3v7h8V3"/><path d="M8 21v-7h8v7"/>',
+        'layout-dashboard': '<rect x="3" y="3" width="7" height="8" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="15" width="7" height="6" rx="1"/>',
+        'folder-kanban': '<path d="M3 6h7l2 2h9v11H3z"/><path d="M8 11v5"/><path d="M12 11v7"/><path d="M16 11v4"/>',
+        'chart-no-axes-combined': '<path d="M4 18c4-7 6-7 9-3 2 3 4 3 7-5"/><path d="M6 19V9"/><path d="M11 19v-5"/><path d="M16 19v-8"/>',
+        'panel-top': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/>',
+        'sliders-horizontal': '<path d="M4 7h8"/><path d="M16 7h4"/><circle cx="14" cy="7" r="2"/><path d="M4 17h4"/><path d="M12 17h8"/><circle cx="10" cy="17" r="2"/>',
+        images: '<rect x="3" y="5" width="15" height="14" rx="2"/><path d="M7 15l3-3 3 3 2-2 3 3"/><circle cx="8" cy="9" r="1.5"/><path d="M8 3h13v13"/>',
+        'calendar-check': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/><path d="m8 16 2 2 5-5"/>',
+        settings: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.3 3a7 7 0 0 0-1.7 1L5.1 6l-2 3.5L5 11a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 1.7 1l.4 3h5l.3-3a7 7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5c.1-.3.1-.7.1-1z"/>',
+        'folder-check': '<path d="M3 6h7l2 2h9v11H3z"/><path d="m9 14 2 2 5-5"/>',
+        activity: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+        'calendar-clock': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/><circle cx="12" cy="16" r="3"/><path d="M12 14.5V16l1.2 1"/>',
+        'triangle-alert': '<path d="M12 3 22 20H2z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
+        check: '<path d="m5 12 4 4L19 6"/>',
+        'heart-pulse': '<path d="M20.5 5.5a5 5 0 0 0-7.1 0L12 7l-1.4-1.5a5 5 0 1 0-7.1 7.1L12 21l8.5-8.4a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
+        'trash-2': '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'
+      };
+      document.querySelectorAll('i[data-lucide]').forEach(node => {
+        const name = node.dataset.lucide;
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '1.8');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.innerHTML = icons[name] || icons.activity;
+        node.replaceWith(svg);
+      });
+    }
+
+    function renderMatrix() {
+      const groups = {
+        do: ['Терміново / Важливо', 'high', 'high', 'danger'],
+        plan: ['Не терміново / Важливо', 'low', 'high', 'mint'],
+        delegate: ['Терміново / Не важливо', 'high', 'low', 'warning'],
+        later: ['Не терміново / Не важливо', 'low', 'low', 'gold']
+      };
+      document.getElementById('matrix').innerHTML = `
+        <div class="card pad">
+          <div class="matrix">
+            ${Object.entries(groups).map(([, [title, urgency, importance, cls]]) => {
+              const items = state.tasks.filter(t => t.status !== 'done' && t.urgency === urgency && t.importance === importance);
+              return `
+                <div class="quadrant" ondragover="event.preventDefault()" ondrop="dropTaskToMatrix(event, '${urgency}', '${importance}')">
+                  <h3><span class="pill ${cls}">${title}</span></h3>
+                  ${items.length ? items.map(t => `<div class="mini-task" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${t.id}')"><strong>${escapeHTML(t.title)}</strong><div class="muted tiny">${projectById(t.projectId).title} · ${formatDate(t.deadline)}</div></div>`).join('') : '<div class="muted tiny">Порожньо. Перетягніть сюди задачу.</div>'}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSpecial() {
+      const tourProjects = state.projects.filter(p => p.tour);
+      const designProjects = state.projects.filter(p => p.specs);
+      const noTour = !tourProjects.length;
+      const noSpecs = !designProjects.length;
+      document.getElementById('special').innerHTML = `
+        <div class="grid grid-2">
+          <div class="card pad">
+            <div class="card-header">
+              <div><div class="eyebrow">Tour Operator</div><h2 class="card-title">Метадані турів</h2></div>
+              <button class="btn" onclick="navigate('projects')"><i data-lucide="plus"></i> Проєкт</button>
+            </div>
+            ${noTour ? `
+              <div class="note-card" style="text-align:center;padding:32px">
+                <h3>Тур-метаданих ще немає</h3>
+                <p class="muted" style="line-height:1.6;margin-top:8px">Відкрийте або створіть проєкт і заповніть вкладку <strong>«Тур-метадані»</strong> у формі редагування.</p>
+                <button class="btn btn-primary" style="margin-top:14px" onclick="openProjectModal()"><i data-lucide="plus"></i> Новий проєкт</button>
+              </div>` :
+              tourProjects.map(p => `
+              <div class="note-card" style="margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                  <h3 style="margin:0">${escapeHTML(p.title)}</h3>
+                  <button class="btn" onclick="openProjectModal('${p.id}')"><i data-lucide="sliders-horizontal"></i> Редагувати</button>
+                </div>
+                <div class="grid grid-2" style="gap:10px">
+                  ${p.tour.pledgeType ? `<div><span class="muted tiny">Тип застави</span><br><strong>${escapeHTML(p.tour.pledgeType)}</strong></div>` : ''}
+                  ${p.tour.dates ? `<div><span class="muted tiny">Дати туру</span><br><strong>${escapeHTML(p.tour.dates)}</strong></div>` : ''}
+                  ${p.tour.cancellation ? `<div><span class="muted tiny">Ануляція</span><br><strong>${escapeHTML(p.tour.cancellation)}</strong></div>` : ''}
+                  ${p.tour.capacity ? `<div><span class="muted tiny">Місткість</span><br><strong>${escapeHTML(p.tour.capacity)}</strong></div>` : ''}
+                </div>
+                ${p.tour.checklist ? `<div style="margin-top:10px"><span class="muted tiny">Чек-лист</span><br><span style="font-size:13px;line-height:1.6">${escapeHTML(p.tour.checklist)}</span></div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+          <div class="card pad">
+            <div class="card-header">
+              <div><div class="eyebrow">Design Specs</div><h2 class="card-title">Технічні параметри дизайну</h2></div>
+              <button class="btn" onclick="navigate('projects')"><i data-lucide="plus"></i> Проєкт</button>
+            </div>
+            ${noSpecs ? `
+              <div class="note-card" style="text-align:center;padding:32px">
+                <h3>Специфікацій ще немає</h3>
+                <p class="muted" style="line-height:1.6;margin-top:8px">Відкрийте або створіть проєкт і заповніть вкладку <strong>«Дизайн-специфікація»</strong> у формі редагування.</p>
+                <button class="btn btn-primary" style="margin-top:14px" onclick="openProjectModal()"><i data-lucide="plus"></i> Новий проєкт</button>
+              </div>` :
+              designProjects.map(p => `
+              <div class="note-card" style="margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                  <h3 style="margin:0">${escapeHTML(p.title)}</h3>
+                  <button class="btn" onclick="openProjectModal('${p.id}')"><i data-lucide="sliders-horizontal"></i> Редагувати</button>
+                </div>
+                <div class="grid grid-2" style="gap:10px">
+                  ${p.specs.size ? `<div><span class="muted tiny">Формат / Розмір</span><br><strong>${escapeHTML(p.specs.size)}</strong></div>` : ''}
+                  ${p.specs.color ? `<div><span class="muted tiny">Колірний профіль</span><br><strong>${escapeHTML(p.specs.color)}</strong></div>` : ''}
+                  ${p.specs.affinity ? `<div><span class="muted tiny">Програми</span><br><strong>${escapeHTML(p.specs.affinity)}</strong></div>` : ''}
+                  ${p.specs.print ? `<div><span class="muted tiny">Друк</span><br><strong>${escapeHTML(p.specs.print)}</strong></div>` : ''}
+                </div>
+                ${p.specs.notes ? `<div style="margin-top:10px"><span class="muted tiny">Нотатки</span><br><span style="font-size:13px;line-height:1.6">${escapeHTML(p.specs.notes)}</span></div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderNotes() {
+      document.getElementById('notes').innerHTML = `
+        <div class="card pad" style="margin-bottom:16px">
+          <div class="card-header"><div><div class="eyebrow">References</div><h2 class="card-title">Нотатки й референси</h2></div></div>
+          <form id="noteForm" class="form-grid">
+            <input id="noteTitle" placeholder="Назва нотатки" required>
+            <select id="noteProject">${state.projects.map(p => `<option value="${p.id}">${escapeHTML(p.title)}</option>`).join('')}</select>
+            <input id="noteStage" placeholder="Етап">
+            <input id="noteUrl" placeholder="Посилання або локальний шлях">
+            <textarea id="noteText" placeholder="Короткий контекст"></textarea>
+            <button class="btn btn-primary" type="submit"><i data-lucide="plus"></i> Додати нотатку</button>
+          </form>
+        </div>
+        <div class="grid grid-3">
+          ${state.notes.length ? state.notes.map(note => `
+            <article class="note-card">
+              <span class="pill gold">${projectById(note.projectId).title}</span>
+              <h3>${escapeHTML(note.title)}</h3>
+              <p class="muted tiny">${escapeHTML(note.stage)}${note.text ? ' · ' + escapeHTML(note.text) : ''}</p>
+              ${note.url ? `<a href="${escapeHTML(note.url)}" target="_blank" rel="noreferrer noopener">${escapeHTML(note.url)}</a>` : ''}
+              <div style="margin-top:10px"><button class="btn btn-danger" onclick="deleteNote('${note.id}')"><i data-lucide="trash-2"></i> Видалити</button></div>
+            </article>
+          `).join('') : `<div class="note-card"><h3>Нотаток ще немає</h3><p class="muted">Додайте перший moodboard або референс через форму вище.</p></div>`}
+        </div>
+      `;
+      document.getElementById('noteForm')?.addEventListener('submit', event => {
+        event.preventDefault();
+        addNote();
+      });
+    }
+
+    function renderSessions() {
+      document.getElementById('sessions').innerHTML = `
+        <div class="grid wide-grid">
+          <div class="card pad">
+            <div class="card-header"><div><div class="eyebrow">Planning</div><h2 class="card-title">Clarity Sessions</h2></div></div>
+            <form id="sessionForm" class="form-grid" style="margin-bottom:14px">
+              <input id="sessionTitle" placeholder="Назва сесії" required>
+              <div class="datepicker-wrap" id="dpWrap_sessionDate">
+                <button type="button" class="datepicker-input" id="sessionDate" data-value="">
+                  <span class="dp-display">Дата сесії</span>
+                </button>
+                <svg class="datepicker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/></svg>
+                <div class="datepicker-pop" id="dp_sessionDate"></div>
+              </div>
+              <input id="sessionFocus" placeholder="Фокус">
+              <button class="btn btn-primary" type="submit"><i data-lucide="plus"></i> Додати сесію</button>
+            </form>
+            ${state.sessions.length ? state.sessions.map(s => {
+              const d = new Date(s.date + 'T12:00:00');
+              return `
+                <div class="session-row">
+                  <div class="date-box"><strong>${d.getDate()}</strong><span>${d.toLocaleDateString('uk-UA', { month: 'short' })}</span></div>
+                  <div><strong>${s.title}</strong><div class="muted tiny">${s.focus}</div></div>
+                  <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end"><span class="pill mint">${s.result}</span><button class="btn icon-btn btn-danger" onclick="deleteSession('${s.id}')" title="Видалити сесію"><i data-lucide="trash-2"></i></button></div>
+                </div>
+              `;
+            }).join('') : `<div class="note-card"><h3>Сесій ще немає</h3><p class="muted">Додайте першу Clarity Session і зафіксуйте фокус тижня.</p></div>`}
+          </div>
+          <div class="card pad">
+            <div class="eyebrow">Agenda</div>
+            <h2 class="card-title">Шаблон сесії</h2>
+            <div style="margin-top:14px;display:grid;gap:10px">
+              ${['Перевірити прострочені дедлайни', 'Оновити Health Score', 'Вибрати 3 головні задачі тижня', 'Зафіксувати рішення та наступні кроки'].map(item => `<div class="mini-task">${item}</div>`).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+      initDatepicker('sessionDate');
+      setDatepickerValue('sessionDate', addDays(7));
+      document.getElementById('sessionForm')?.addEventListener('submit', event => {
+        event.preventDefault();
+        addSession();
+      });
+    }
+
+    function renderSettings() {
+      const el = document.getElementById('settings');
+      if (!el) return;
+      const appName = state.appName || 'Clarity';
+      const appSubtitle = state.appSubtitle || 'Personal project ecosystem';
+      el.innerHTML = `
+        <div class="grid wide-grid">
+          <div>
+            <div class="card pad" style="margin-bottom:16px">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">Domains</div>
+                  <h2 class="card-title">Домени роботи</h2>
+                  <p class="muted tiny">Домени використовуються в задачах, проєктах і аналітиці.</p>
+                </div>
+              </div>
+              <form id="domainForm" class="form-grid" style="margin-bottom:14px">
+                <div class="field">
+                  <label for="domainName">Назва домену</label>
+                  <input id="domainName" placeholder="Наприклад: Відео">
+                </div>
+                <div class="field">
+                  <label for="domainColor">Колір</label>
+                  <input id="domainColor" type="color" value="#29585E">
+                </div>
+                <button class="btn btn-primary" type="submit"><i data-lucide="plus"></i> Додати домен</button>
+              </form>
+              <div>
+                ${state.domains.map(domain => `
+                  <div class="domain-row">
+                    <div><span class="swatch" style="background:${domain.color}"></span><input value="${escapeHTML(domain.name)}" onchange="updateDomainName('${domain.id}', this.value)" title="Назва домену"></div>
+                    <input type="color" value="${domain.color}" onchange="updateDomainColor('${domain.id}', this.value)" title="Колір домену">
+                    <button class="btn btn-danger icon-btn" onclick="removeDomain('${domain.id}')" title="Видалити домен"><i data-lucide="trash-2"></i></button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="card pad">
+              <div class="eyebrow">Status labels</div>
+              <h2 class="card-title" style="margin-bottom:4px">Назви статусів задач</h2>
+              <p class="muted tiny" style="margin-bottom:12px">Змініть підписи — вони одразу відображаються скрізь.</p>
+              ${Object.entries(STATUS_CONFIG).map(([key, cfg]) => `
+                <div class="domain-row" style="grid-template-columns:auto 1fr">
+                  <span class="pill ${cfg.cls}" style="white-space:nowrap;min-width:90px;justify-content:center">${escapeHTML(cfg.label)}</span>
+                  <input value="${escapeHTML(cfg.label)}" onchange="updateStatusLabel('${key}', this.value)" title="Назва статусу ${key}">
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div>
+            <div class="card pad" style="margin-bottom:16px">
+              <div class="eyebrow">App identity</div>
+              <h2 class="card-title" style="margin-bottom:14px">Назва і підзаголовок</h2>
+              <div class="field" style="margin-bottom:10px">
+                <label>Назва застосунку</label>
+                <input id="settingsAppName" value="${escapeHTML(appName)}" placeholder="Clarity">
+              </div>
+              <div class="field" style="margin-bottom:14px">
+                <label>Підзаголовок</label>
+                <input id="settingsAppSubtitle" value="${escapeHTML(appSubtitle)}" placeholder="Personal project ecosystem">
+              </div>
+              <button class="btn btn-primary" onclick="saveAppIdentity()"><i data-lucide="save"></i> Зберегти</button>
+            </div>
+
+            <!-- Logo -->
+            <div class="card pad" style="margin-bottom:16px">
+              <div class="eyebrow">Logo</div>
+              <h2 class="card-title" style="margin-bottom:12px">Логотип застосунку</h2>
+              <div class="logo-preview" id="logoPreviewBox">
+                ${state.logoDataUrl ? `<img src="${state.logoDataUrl}" alt="logo">` : `<i data-lucide="aperture" style="width:28px;height:28px;color:var(--gold)"></i>`}
+              </div>
+              <p class="muted tiny" style="text-align:center;margin:6px 0 12px">PNG, SVG, JPG до 500 КБ</p>
+              <div style="display:flex;gap:8px;justify-content:center">
+                <label class="btn btn-primary" style="cursor:pointer">
+                  <i data-lucide="upload"></i> Завантажити
+                  <input type="file" accept="image/*,.svg" style="display:none" onchange="uploadLogo(event)">
+                </label>
+                ${state.logoDataUrl ? `<button class="btn btn-danger" onclick="removeLogo()"><i data-lucide="trash-2"></i> Видалити</button>` : ''}
+              </div>
+            </div>
+
+            <!-- Firebase / Account -->
+            <div class="card pad" style="margin-bottom:16px">
+              <div class="eyebrow">Firebase & Акаунт</div>
+              <h2 class="card-title" style="margin-bottom:10px">Хмарна синхронізація</h2>
+              ${currentUser ? `
+                <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--mint-2)">
+                  <div>
+                    <div style="font-size:13px;font-weight:600">${escapeHTML(currentUser.displayName || '')}</div>
+                    <div class="muted tiny">${escapeHTML(currentUser.email || '')}</div>
+                    <div class="muted tiny" style="margin-top:2px">UID: ${escapeHTML(currentUser.uid)}</div>
+                  </div>
+                  <span class="pill mint" style="margin-left:auto">Підключено</span>
+                </div>
+                <p class="muted tiny" style="margin-bottom:12px;line-height:1.6">Дані автоматично зберігаються в Firestore. Колекція: <code>clarity_users/${escapeHTML(currentUser.uid)}</code></p>
+                <button class="btn btn-danger" onclick="if(confirm('Вийти?')) firebase.auth().signOut()"><i data-lucide="log-out"></i> Вийти з акаунту</button>
+              ` : `
+                <p class="muted tiny" style="margin-bottom:12px;line-height:1.6">Ви не авторизовані. Дані зберігаються тільки локально.</p>
+                <button class="btn btn-primary" onclick="document.getElementById('authScreen').classList.remove('hidden')"><i data-lucide="log-in"></i> Увійти через Google</button>
+              `}
+            </div>
+
+            <!-- Backup -->
+            <div class="card pad" style="margin-bottom:16px">
+              <div class="eyebrow">Backup</div>
+              <h2 class="card-title" style="margin-bottom:8px">Резервне копіювання</h2>
+              <p class="muted tiny" style="margin-bottom:14px;line-height:1.6">Зберігайте бекапи регулярно. JSON-файл містить усі проєкти, задачі, нотатки та налаштування.</p>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="exportBackup()"><i data-lucide="download"></i> Зберегти бекап</button>
+                <button class="btn" onclick="importBackup()"><i data-lucide="upload"></i> Відновити з бекапу</button>
+              </div>
+            </div>
+
+            <div class="card pad">
+              <div class="eyebrow">Theme</div>
+              <h2 class="card-title">Палітра Casal / Beryl Green</h2>
+              <p class="muted" style="line-height:1.6;margin-top:8px">Основний фон і навігація — Casal <code>#29585E</code>. Текст — Beryl Green <code>#E2E2B9</code>.</p>
+              <div class="grid grid-2" style="margin-top:14px">
+                <div class="note-card" style="background:#29585E;color:#E2E2B9"><h3>Casal</h3><p>#29585E</p></div>
+                <div class="note-card" style="background:#E2E2B9;color:#173b40"><h3>Beryl Green</h3><p>#E2E2B9</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('domainForm')?.addEventListener('submit', event => {
+        event.preventDefault();
+        addDomain();
+      });
+    }
+
+    function addDomain() {
+      const name = document.getElementById('domainName').value.trim();
+      const color = document.getElementById('domainColor').value;
+      if (!name) return showToast('Вкажіть назву домену.');
+      if (state.domains.some(d => d.name.toLowerCase() === name.toLowerCase())) return showToast('Такий домен уже існує.');
+      state.domains.push({ id: uid(), name, color });
+      saveState();
+      showToast('Домен додано.');
+      render();
+    }
+
+    function updateDomainColor(id, color) {
+      const domain = state.domains.find(d => d.id === id);
+      if (!domain) return;
+      domain.color = color;
+      saveState();
+      showToast('Колір домену оновлено.');
+      render();
+    }
+
+    function updateDomainName(id, value) {
+      const domain = state.domains.find(d => d.id === id);
+      const name = value.trim();
+      if (!domain || !name) return render();
+      if (state.domains.some(d => d.id !== id && d.name.toLowerCase() === name.toLowerCase())) {
+        showToast('Такий домен уже існує.');
+        return render();
+      }
+      const oldName = domain.name;
+      domain.name = name;
+      state.projects.forEach(project => { if (project.domain === oldName) project.domain = name; });
+      state.tasks.forEach(task => { if (task.domain === oldName) task.domain = name; });
+      saveState();
+      showToast('Домен перейменовано.');
+      render();
+    }
+
+    function removeDomain(id) {
+      const domain = state.domains.find(d => d.id === id);
+      if (!domain) return;
+      const used = state.projects.some(p => p.domain === domain.name) || state.tasks.some(t => t.domain === domain.name);
+      if (used) return showToast('Домен використовується у проєктах або задачах. Спершу змініть їхній домен.');
+      state.domains = state.domains.filter(d => d.id !== id);
+      saveState();
+      showToast('Домен видалено.');
+      render();
+    }
+
+    function updateStatusLabel(key, value) {
+      const label = value.trim();
+      if (!label || !STATUS_CONFIG[key]) return;
+      STATUS_CONFIG[key].label = label;
+      // persist custom labels in state
+      if (!state.statusLabels) state.statusLabels = {};
+      state.statusLabels[key] = label;
+      saveState();
+      showToast('Назву статусу оновлено.');
+    }
+
+    function saveAppIdentity() {
+      const name = document.getElementById('settingsAppName')?.value.trim();
+      const subtitle = document.getElementById('settingsAppSubtitle')?.value.trim();
+      if (name) { state.appName = name; document.querySelector('.brand-title').textContent = name; document.title = name + ' — Project Management'; }
+      if (subtitle) { state.appSubtitle = subtitle; document.querySelector('.brand-subtitle').textContent = subtitle; }
+      saveState();
+      showToast('Назву застосунку збережено.');
+    }
+
+    function uploadLogo(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (file.size > 512 * 1024) return showToast('Файл занадто великий. Максимум 500 КБ.');
+      const reader = new FileReader();
+      reader.onload = e => {
+        state.logoDataUrl = e.target.result;
+        saveState();
+        applyLogo();
+        renderSettings();
+        renderIcons();
+        showToast('Логотип оновлено.');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeLogo() {
+      if (!confirm('Видалити логотип?')) return;
+      delete state.logoDataUrl;
+      saveState();
+      applyLogo();
+      renderSettings();
+      renderIcons();
+      showToast('Логотип видалено.');
+    }
+
+    function applyLogo() {
+      const mark = document.querySelector('.brand-mark');
+      if (!mark) return;
+      if (state.logoDataUrl) {
+        mark.innerHTML = `<img src="${state.logoDataUrl}" style="width:100%;height:100%;object-fit:contain;border-radius:8px" alt="logo">`;
+      } else {
+        mark.innerHTML = `<i data-lucide="aperture"></i>`;
+        renderIcons();
+      }
+    }
+
+    function applyAppIdentity() {
+      if (state.appName) { document.querySelector('.brand-title').textContent = state.appName; document.title = state.appName + ' — Project Management'; }
+      if (state.appSubtitle) document.querySelector('.brand-subtitle').textContent = state.appSubtitle;
+      if (state.statusLabels) Object.entries(state.statusLabels).forEach(([key, label]) => { if (STATUS_CONFIG[key]) STATUS_CONFIG[key].label = label; });
+    }
+
+    function renderTaskProjectOptions() {
+      const select = document.getElementById('taskProject');
+      if (select) select.innerHTML = state.projects.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+      const domainOptions = state.domains.map(d => `<option value="${escapeHTML(d.name)}">${escapeHTML(d.name)}</option>`).join('');
+      const taskDomain = document.getElementById('taskDomain');
+      const projectDomain = document.getElementById('projectDomain');
+      if (taskDomain) taskDomain.innerHTML = domainOptions;
+      if (projectDomain) projectDomain.innerHTML = domainOptions;
+    }
+
+    function openTaskModal(id = '', projectId = '') {
+      const task = state.tasks.find(t => t.id === id);
+      document.getElementById('modalTitle').textContent = task ? 'Редагувати задачу' : 'Нова задача';
+      document.getElementById('taskId').value = task?.id || '';
+      document.getElementById('taskTitle').value = task?.title || '';
+      document.getElementById('taskProject').value = task?.projectId || projectId || state.projects[0]?.id || '';
+      document.getElementById('taskDomain').value = task?.domain || 'Дизайн';
+      setDatepickerValue('taskDeadline', task?.deadline || todayISO());
+      initDatepicker('taskDeadline');
+      document.getElementById('taskUrgency').value = task?.urgency || 'high';
+      document.getElementById('taskImportance').value = task?.importance || 'high';
+      document.getElementById('taskEstimate').value = task?.estimate || 1;
+      document.getElementById('taskStatus').value = task?.status || 'open';
+      document.getElementById('taskNote').value = task?.note || '';
+      document.getElementById('taskModal').classList.add('open');
+      renderIcons();
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.remove('open');
+    }
+
+    // ── Dynamic project tabs engine ────────────────────────────────────────
+    // Extra tabs are stored in state.projectTabDefs: [{id, label, fields:[{id,label,type,placeholder}]}]
+    // field types: 'text' | 'textarea'
+
+    function getProjectTabDefs() {
+      if (!state.projectTabDefs) state.projectTabDefs = [
+        {
+          id: 'specs', label: 'Дизайн-специфікація',
+          fields: [
+            { id:'specSize',     label:'Формат / Розмір',    type:'text',     placeholder:'A3 / 300 DPI' },
+            { id:'specColor',    label:'Колірний профіль',   type:'text',     placeholder:'CMYK FOGRA39, sRGB...' },
+            { id:'specAffinity', label:'Програми',           type:'text',     placeholder:'Affinity Publisher + Designer' },
+            { id:'specPrint',    label:'Особливості друку',  type:'text',     placeholder:'Gold foil, embossing, bleed 3mm' },
+            { id:'specNotes',    label:'Нотатки',            type:'textarea', placeholder:'Шрифти, відступи, сітка...' },
+          ]
+        },
+        {
+          id: 'tour', label: 'Тур-метадані',
+          fields: [
+            { id:'tourPledgeType',    label:'Тип застави',       type:'text',     placeholder:'30% депозит...' },
+            { id:'tourCancellation',  label:'Умови ануляції',    type:'text',     placeholder:'Без штрафу до 21 дня...' },
+            { id:'tourDates',         label:'Дати туру',         type:'text',     placeholder:'12–22 червня 2025' },
+            { id:'tourCapacity',      label:'Місткість / Група', type:'text',     placeholder:'12 осіб, мінімум 8' },
+            { id:'tourChecklist',     label:'Чек-лист',          type:'textarea', placeholder:'Готелі, трансфери, ваучери...' },
+          ]
+        }
+      ];
+      return state.projectTabDefs;
+    }
+
+    function renderProjectModalTabs(activeTab = 'base') {
+      const tabDefs = getProjectTabDefs();
+      const bar = document.getElementById('projTabsBar');
+      const extraPanels = document.getElementById('projExtraPanels');
+      if (!bar || !extraPanels) return;
+
+      // Build tab bar
+      bar.innerHTML = `
+        <button type="button" class="proj-tab${activeTab==='base' ? ' active' : ''}" data-tab="base">Основне</button>
+        ${tabDefs.map(t => `
+          <button type="button" class="proj-tab${activeTab===t.id ? ' active' : ''}" data-tab="${escapeHTML(t.id)}" title="${escapeHTML(t.label)}">
+            ${escapeHTML(t.label)}
+            <span class="proj-tab-del" title="Видалити вкладку" onclick="removeProjectTab('${t.id}',event)">×</span>
+          </button>`).join('')}
+        <button type="button" class="proj-tab-add" onclick="addProjectTabPrompt()">+ Вкладка</button>
+      `;
+
+      // Build extra panels
+      extraPanels.innerHTML = tabDefs.map(t => `
+        <div class="modal-content proj-tab-panel" data-panel="${escapeHTML(t.id)}" style="${activeTab===t.id ? '' : 'display:none'}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <p class="muted tiny" style="margin:0">Вкладка: <strong>${escapeHTML(t.label)}</strong></p>
+            <button type="button" class="btn btn-ghost" style="font-size:12px" onclick="editProjectTabLabel('${t.id}')"><i data-lucide="pencil"></i> Перейменувати</button>
+          </div>
+          ${buildTabFieldsHTML(t)}
+          <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
+            <button type="button" class="btn btn-ghost" style="font-size:12px" onclick="addFieldToTab('${t.id}')"><i data-lucide="plus"></i> Додати поле</button>
+          </div>
+        </div>`).join('');
+
+      // Wire tab clicks
+      bar.querySelectorAll('.proj-tab[data-tab]').forEach(btn => {
+        btn.addEventListener('click', () => switchProjectTab(btn.dataset.tab));
+      });
+
+      requestAnimationFrame(renderIcons);
+    }
+
+    function buildTabFieldsHTML(tabDef) {
+      const gridFields = tabDef.fields.filter(f => f.type === 'text');
+      const textareaFields = tabDef.fields.filter(f => f.type === 'textarea');
+      return `
+        <div class="form-grid">
+          ${gridFields.map(f => `
+            <div class="field" style="position:relative">
+              <label style="display:flex;align-items:center;justify-content:space-between">
+                ${escapeHTML(f.label)}
+                <button type="button" class="btn icon-btn btn-danger" style="width:18px;height:18px;font-size:11px;opacity:.5" title="Видалити поле" onclick="removeTabField('${tabDef.id}','${f.id}')">×</button>
+              </label>
+              <input id="${escapeHTML(f.id)}" placeholder="${escapeHTML(f.placeholder||'')}">
+            </div>`).join('')}
+        </div>
+        ${textareaFields.map(f => `
+          <div class="field" style="margin-top:10px;position:relative">
+            <label style="display:flex;align-items:center;justify-content:space-between">
+              ${escapeHTML(f.label)}
+              <button type="button" class="btn icon-btn btn-danger" style="width:18px;height:18px;font-size:11px;opacity:.5" title="Видалити поле" onclick="removeTabField('${tabDef.id}','${f.id}')">×</button>
+            </label>
+            <textarea id="${escapeHTML(f.id)}" placeholder="${escapeHTML(f.placeholder||'')}"></textarea>
+          </div>`).join('')}
+      `;
+    }
+
+    function addProjectTabPrompt() {
+      const label = window.prompt('Назва нової вкладки:');
+      if (!label || !label.trim()) return;
+      const tabDefs = getProjectTabDefs();
+      const id = 'tab_' + uid();
+      tabDefs.push({ id, label: label.trim(), fields: [] });
+      state.projectTabDefs = tabDefs;
+      saveState();
+      renderProjectModalTabs(id);
+      switchProjectTab(id);
+      showToast('Вкладку «' + label.trim() + '» додано.');
+    }
+
+    function removeProjectTab(tabId, event) {
+      event.stopPropagation();
+      const tabDefs = getProjectTabDefs();
+      const tab = tabDefs.find(t => t.id === tabId);
+      if (!tab) return;
+      if (!confirm('Видалити вкладку «' + tab.label + '»? Усі поля цієї вкладки буде видалено.')) return;
+      state.projectTabDefs = tabDefs.filter(t => t.id !== tabId);
+      // Remove all field data from all projects
+      state.projects.forEach(p => {
+        tab.fields.forEach(f => { delete p['_'+f.id]; });
+        if (p.customTabs) delete p.customTabs[tabId];
+      });
+      saveState();
+      renderProjectModalTabs('base');
+      switchProjectTab('base');
+      showToast('Вкладку видалено.');
+    }
+
+    function editProjectTabLabel(tabId) {
+      const tabDefs = getProjectTabDefs();
+      const tab = tabDefs.find(t => t.id === tabId);
+      if (!tab) return;
+      const label = window.prompt('Нова назва вкладки:', tab.label);
+      if (!label || !label.trim()) return;
+      tab.label = label.trim();
+      state.projectTabDefs = tabDefs;
+      saveState();
+      renderProjectModalTabs(tabId);
+      showToast('Вкладку перейменовано.');
+    }
+
+    function addFieldToTab(tabId) {
+      const tabDefs = getProjectTabDefs();
+      const tab = tabDefs.find(t => t.id === tabId);
+      if (!tab) return;
+      const label = window.prompt('Назва нового поля:');
+      if (!label || !label.trim()) return;
+      const typeChoice = window.confirm('Однорядкове поле? ОК = текстове, Скасувати = textarea');
+      const fieldId = 'field_' + uid();
+      tab.fields.push({
+        id: fieldId,
+        label: label.trim(),
+        type: typeChoice ? 'text' : 'textarea',
+        placeholder: ''
+      });
+      state.projectTabDefs = tabDefs;
+      saveState();
+      renderProjectModalTabs(tabId);
+      switchProjectTab(tabId);
+      showToast('Поле «' + label.trim() + '» додано.');
+    }
+
+    function removeTabField(tabId, fieldId) {
+      const tabDefs = getProjectTabDefs();
+      const tab = tabDefs.find(t => t.id === tabId);
+      if (!tab) return;
+      tab.fields = tab.fields.filter(f => f.id !== fieldId);
+      state.projectTabDefs = tabDefs;
+      saveState();
+      renderProjectModalTabs(tabId);
+      switchProjectTab(tabId);
+    }
+
+    function openProjectModal(id = '') {
+      const project = state.projects.find(p => p.id === id);
+      renderTaskProjectOptions();
+      document.getElementById('projectModalTitle').textContent = project ? 'Редагувати проєкт' : 'Новий проєкт';
+      document.getElementById('projectId').value = project?.id || '';
+
+      // Render tabs first (builds input fields)
+      renderProjectModalTabs('base');
+
+      document.getElementById('projectTitle').value = project?.title || '';
+      document.getElementById('projectDomain').value = project?.domain || state.domains[0]?.name || 'Дизайн';
+      document.getElementById('projectStage').value = project?.stage || '';
+      // Datepicker
+      setDatepickerValue('projectDue', project?.due || addDays(7));
+      const colors = parseCoverColors(project?.cover);
+      document.getElementById('projectCoverA').value = colors[0];
+      document.getElementById('projectCoverB').value = colors[1];
+      document.getElementById('projectDescription').value = project?.description || '';
+
+      // Fill extra tab fields
+      const tabDefs = getProjectTabDefs();
+      tabDefs.forEach(tab => {
+        tab.fields.forEach(f => {
+          const el = document.getElementById(f.id);
+          if (el) el.value = project?.customTabs?.[tab.id]?.[f.id] || '';
+        });
+      });
+
+      updateCoverPreview();
+      document.getElementById('projectModal').classList.add('open');
+
+      // Init datepicker for projectDue
+      initDatepicker('projectDue');
+      // Re-init cover preview listeners (DOM was rebuilt)
+      document.getElementById('projectCoverA').addEventListener('input', updateCoverPreview);
+      document.getElementById('projectCoverB').addEventListener('input', updateCoverPreview);
+
+      renderIcons();
+    }
+
+    function switchProjectTab(name) {
+      document.querySelectorAll('#projTabsBar .proj-tab[data-tab]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === name);
+      });
+      document.querySelectorAll('#projTabPanels .proj-tab-panel, #projExtraPanels .proj-tab-panel').forEach(panel => {
+        panel.style.display = panel.dataset.panel === name ? '' : 'none';
+      });
+    }
+
+    function updateCoverPreview() {
+      const a = document.getElementById('projectCoverA')?.value || '#29585E';
+      const b = document.getElementById('projectCoverB')?.value || '#E2E2B9';
+      const preview = document.getElementById('coverPreview');
+      if (preview) preview.style.background = `linear-gradient(135deg, ${a}, ${b})`;
+    }
+
+    function coverGradient(a, b) {
+      return `linear-gradient(135deg, ${safeHex(a, '#29585E')}, ${safeHex(b, '#E2E2B9')})`;
+    }
+
+    function safeHex(value, fallback) {
+      return /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+    }
+
+    function parseCoverColors(value = '') {
+      const matches = String(value).match(/#[0-9a-fA-F]{6}/g);
+      return [matches?.[0] || '#29585E', matches?.[1] || '#E2E2B9'];
+    }
+
+    function closeProjectModal() {
+      document.getElementById('projectModal').classList.remove('open');
+    }
+
+    function toggleTask(id) {
+      const task = state.tasks.find(t => t.id === id);
+      if (!task) return;
+      if (task.status === 'done') {
+        task.status = 'open';
+        task.completedAt = null;
+        showToast('Задачу повернено в роботу.');
+      } else {
+        task.status = 'done';
+        task.completedAt = todayISO();
+        showToast('Задачу закрито. Ближче до Pure Clarity.');
+      }
+      saveState();
+      rerenderActive();
+    }
+
+    function deleteTask(id) {
+      const task = state.tasks.find(t => t.id === id);
+      if (!task) return;
+      if (!confirm('Видалити задачу «' + task.title + '»?')) return;
+      state.tasks = state.tasks.filter(t => t.id !== id);
+      saveState();
+      showToast('Задачу видалено.');
+      rerenderActive();
+    }
+
+    function deleteProject(id) {
+      const project = state.projects.find(p => p.id === id);
+      if (!project) return;
+      const relatedTasks = state.tasks.filter(t => t.projectId === id).length;
+      const relatedNotes = state.notes.filter(n => n.projectId === id).length;
+      const parts = [];
+      if (relatedTasks) parts.push(relatedTasks + '\u00a0задач');
+      if (relatedNotes) parts.push(relatedNotes + '\u00a0нотаток');
+      const msg = parts.length ? 'Разом буде видалено: ' + parts.join(', ') + '.' : 'Пов\'язаних даних немає.';
+      if (!confirm('Видалити проєкт «' + project.title + '»?\n\n' + msg)) return;
+      state.projects = state.projects.filter(p => p.id !== id);
+      state.tasks = state.tasks.filter(t => t.projectId !== id);
+      state.notes = state.notes.filter(n => n.projectId !== id);
+      selectedProjectId = state.projects[0]?.id || null;
+      showToast('Проєкт і пов\'язані дані видалено.');
+      rerenderActive();
+    }
+
+
+    function dropTaskToMatrix(event, urgency, importance) {
+      event.preventDefault();
+      const id = event.dataTransfer.getData('text/plain');
+      const task = state.tasks.find(t => t.id === id);
+      if (!task) return;
+      task.urgency = urgency;
+      task.importance = importance;
+      saveState();
+      showToast('Пріоритет задачі оновлено.');
+      rerenderActive();
+    }
+
+    function addNote() {
+      const title = document.getElementById('noteTitle').value.trim();
+      if (!title) return showToast('Вкажіть назву нотатки.');
+      state.notes.push({
+        id: uid(),
+        title,
+        projectId: document.getElementById('noteProject').value,
+        stage: document.getElementById('noteStage').value.trim() || 'Reference',
+        url: document.getElementById('noteUrl').value.trim(),
+        text: document.getElementById('noteText').value.trim()
+      });
+      saveState();
+      showToast('Нотатку додано.');
+      rerenderActive();
+    }
+
+    function deleteNote(id) {
+      state.notes = state.notes.filter(note => note.id !== id);
+      saveState();
+      showToast('Нотатку видалено.');
+      rerenderActive();
+    }
+
+    function addSession() {
+      const title = document.getElementById('sessionTitle').value.trim();
+      if (!title) return showToast('Вкажіть назву сесії.');
+      state.sessions.push({
+        id: uid(),
+        title,
+        date: getDatepickerValue('sessionDate') || addDays(7),
+        focus: document.getElementById('sessionFocus').value.trim(),
+        result: 'Заплановано'
+      });
+      saveState();
+      showToast('Сесію додано.');
+      rerenderActive();
+    }
+
+    function deleteSession(id) {
+      state.sessions = state.sessions.filter(session => session.id !== id);
+      saveState();
+      showToast('Сесію видалено.');
+      rerenderActive();
+    }
+
+    document.getElementById('taskForm').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const id = document.getElementById('taskId').value || uid();
+      const previous = state.tasks.find(t => t.id === id);
+      const status = document.getElementById('taskStatus').value;
+      const task = {
+        id,
+        title: document.getElementById('taskTitle').value.trim(),
+        projectId: document.getElementById('taskProject').value,
+        domain: document.getElementById('taskDomain').value,
+        deadline: getDatepickerValue('taskDeadline') || todayISO(),
+        urgency: document.getElementById('taskUrgency').value,
+        importance: document.getElementById('taskImportance').value,
+        estimate: Number(document.getElementById('taskEstimate').value || 1),
+        status,
+        note: document.getElementById('taskNote').value.trim(),
+        completedAt: status === 'done' ? (previous?.completedAt || todayISO()) : null
+      };
+      if (previous) Object.assign(previous, task);
+      else state.tasks.push(task);
+      closeTaskModal();
+      showToast('Задачу збережено.');
+      rerenderActive();
+    });
+
+    document.getElementById('saveProjectBtn').addEventListener('click', () => {
+      const id = document.getElementById('projectId').value || uid();
+      const previous = state.projects.find(p => p.id === id);
+      const title = document.getElementById('projectTitle').value.trim();
+      if (!title) { showToast('Вкажіть назву проєкту.'); switchProjectTab('base'); return; }
+      const due = getDatepickerValue('projectDue');
+      const project = {
+        id,
+        title,
+        domain: document.getElementById('projectDomain').value,
+        stage: document.getElementById('projectStage').value.trim(),
+        due: due || addDays(7),
+        cover: coverGradient(document.getElementById('projectCoverA').value, document.getElementById('projectCoverB').value),
+        description: document.getElementById('projectDescription').value.trim(),
+        customTabs: {}
+      };
+
+      // Collect all dynamic tab field values
+      const tabDefs = getProjectTabDefs();
+      tabDefs.forEach(tab => {
+        const tabData = {};
+        let hasData = false;
+        tab.fields.forEach(f => {
+          const el = document.getElementById(f.id);
+          const val = el ? el.value.trim() : '';
+          tabData[f.id] = val;
+          if (val) hasData = true;
+        });
+        if (hasData) project.customTabs[tab.id] = tabData;
+      });
+
+      // Legacy: map built-in specs/tour tab fields to .specs/.tour for renderSpecial
+      const specTab = tabDefs.find(t => t.id === 'specs');
+      if (specTab && project.customTabs.specs) {
+        const d = project.customTabs.specs;
+        project.specs = { size: d.specSize||'', color: d.specColor||'', affinity: d.specAffinity||'', print: d.specPrint||'', notes: d.specNotes||'' };
+        if (!Object.values(project.specs).some(Boolean)) project.specs = null;
+      } else { project.specs = null; }
+
+      const tourTab = tabDefs.find(t => t.id === 'tour');
+      if (tourTab && project.customTabs.tour) {
+        const d = project.customTabs.tour;
+        project.tour = { pledgeType: d.tourPledgeType||'', cancellation: d.tourCancellation||'', dates: d.tourDates||'', capacity: d.tourCapacity||'', checklist: d.tourChecklist||'' };
+        if (!Object.values(project.tour).some(Boolean)) project.tour = null;
+      } else { project.tour = null; }
+
+      if (previous) Object.assign(previous, project);
+      else state.projects.push(project);
+      selectedProjectId = id;
+      closeProjectModal();
+      saveState();
+      showToast('Проєкт збережено.');
+      rerenderActive();
+    });
+
+    function showToast(message) {
+      toastQueue.push(message);
+      if (!toastShowing) showNextToast();
+    }
+
+    function showNextToast() {
+      const message = toastQueue.shift();
+      if (!message) {
+        toastShowing = false;
+        return;
+      }
+      toastShowing = true;
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(showNextToast, 220);
+      }, 2400);
+    }
+
+    function escapeHTML(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
+    }
+
+    document.getElementById('newTaskBtn').addEventListener('click', () => openTaskModal());
+    document.querySelectorAll('[data-close-modal]').forEach(btn => btn.addEventListener('click', closeTaskModal));
+    document.querySelectorAll('[data-close-project]').forEach(btn => btn.addEventListener('click', closeProjectModal));
+    document.getElementById('taskModal').addEventListener('click', event => {
+      if (event.target.id === 'taskModal') closeTaskModal();
+    });
+    document.getElementById('projectModal').addEventListener('click', event => {
+      if (event.target.id === 'projectModal') closeProjectModal();
+    });
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+      drawCharts();
+      renderIcons();
+    });
+
+    window.addEventListener('hashchange', render);
+    window.addEventListener('resize', debounce(() => {
+      if (currentRoute() === 'analytics') drawCharts();
+    }, 120));
+
+    function debounce(fn, wait) {
+      let timer;
+      return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+      };
+    }
+
+    window.openTaskModal = openTaskModal;
+    window.toggleTask = toggleTask;
+    window.deleteTask = deleteTask;
+    window.deleteProject = deleteProject;
+    window.dropTaskToMatrix = dropTaskToMatrix;
+    window.openProject = openProject;
+    window.openProjectModal = openProjectModal;
+    window.addDomain = addDomain;
+    window.updateDomainName = updateDomainName;
+    window.updateDomainColor = updateDomainColor;
+    window.removeDomain = removeDomain;
+    window.setBoardFilter = setBoardFilter;
+    window.deleteNote = deleteNote;
+    window.deleteSession = deleteSession;
+    window.navigate = navigate;
+    window.updateStatusLabel = updateStatusLabel;
+    window.saveAppIdentity = saveAppIdentity;
+    window.applyQuickFilter = applyQuickFilter;
+    window.clearAdvFilters = clearAdvFilters;
+    window.addProjectTabPrompt = addProjectTabPrompt;
+    window.removeProjectTab = removeProjectTab;
+    window.editProjectTabLabel = editProjectTabLabel;
+    window.addFieldToTab = addFieldToTab;
+    window.removeTabField = removeTabField;
+    window.exportBackup = exportBackup;
+    window.importBackup = importBackup;
+
+    // Drag-over highlight for matrix quadrants
+    document.addEventListener('dragenter', e => {
+      const q = e.target.closest?.('.quadrant');
+      if (q) q.classList.add('drag-over');
+    });
+    document.addEventListener('dragleave', e => {
+      const q = e.target.closest?.('.quadrant');
+      if (q && !q.contains(e.relatedTarget)) q.classList.remove('drag-over');
+    });
+    document.addEventListener('drop', e => {
+      document.querySelectorAll('.quadrant.drag-over').forEach(q => q.classList.remove('drag-over'));
+    });
+
+    // Tab switching is wired dynamically in renderProjectModalTabs()
+
+    render();
+    applyAppIdentity();
+
+    // ── Backup functions ─────────────────────────────────────────────────────
+    function exportBackup() {
+      const blob = new Blob([JSON.stringify({ ...state, _exported: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'clarity-backup-' + new Date().toISOString().slice(0,10) + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('Бекап збережено.');
+    }
+
+    function importBackup() {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.json,application/json';
+      input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            if (!data.projects || !data.tasks) throw new Error('Невірний формат файлу.');
+            if (!confirm('Завантажити бекап? Поточні дані будуть замінені.')) return;
+            state = migrateState(data);
+            selectedProjectId = state.projects[0]?.id || null;
+            saveState();
+            showToast('Бекап завантажено успішно.');
+            render();
+          } catch (err) {
+            showToast('Помилка: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    // ── Datepicker engine ────────────────────────────────────────────────────
+    const MONTHS_UA = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
+                       'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+    const DAYS_UA = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+    const dpState = {};
+
+    function initDatepicker(fieldId) {
+      const btn = document.getElementById(fieldId);
+      const pop = document.getElementById('dp_' + fieldId);
+      if (!btn || !pop) return;
+      if (btn._dpInited) return;
+      btn._dpInited = true;
+
+      const today = new Date();
+      const val = btn.dataset.value;
+      let cur = val ? new Date(val + 'T00:00:00') : new Date();
+      dpState[fieldId] = { year: cur.getFullYear(), month: cur.getMonth() };
+
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const isOpen = pop.classList.contains('open');
+        document.querySelectorAll('.datepicker-pop.open').forEach(p => p.classList.remove('open'));
+        if (!isOpen) {
+          const r = btn.getBoundingClientRect();
+          pop.style.top = (r.bottom + window.scrollY + 4) + 'px';
+          pop.style.left = Math.min(r.left + window.scrollX, window.innerWidth - 290) + 'px';
+          pop.classList.add('open');
+          renderDpGrid(fieldId);
+        }
+      });
+      pop.addEventListener('click', e => e.stopPropagation());
+    }
+
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.datepicker-pop.open').forEach(p => p.classList.remove('open'));
+    });
+
+    function renderDpGrid(fieldId) {
+      const pop = document.getElementById('dp_' + fieldId);
+      const btn = document.getElementById(fieldId);
+      if (!pop || !btn) return;
+      const st = dpState[fieldId] || { year: new Date().getFullYear(), month: new Date().getMonth() };
+      const selectedVal = btn.dataset.value;
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0,10);
+      const firstDay = new Date(st.year, st.month, 1);
+      const lastDay = new Date(st.year, st.month + 1, 0);
+      // Mon-first: 0=Mon..6=Sun
+      let startDow = (firstDay.getDay() + 6) % 7;
+      const cells = [];
+      for (let i = 0; i < startDow; i++) cells.push('');
+      for (let d = 1; d <= lastDay.getDate(); d++) cells.push(d);
+      while (cells.length % 7 !== 0) cells.push('');
+
+      pop.innerHTML = `
+        <div class="dp-nav">
+          <button type="button" class="dp-nav-btn" onclick="dpMove('${fieldId}',-1)">&#8249;</button>
+          <span class="dp-month-label">${MONTHS_UA[st.month]} ${st.year}</span>
+          <button type="button" class="dp-nav-btn" onclick="dpMove('${fieldId}',1)">&#8250;</button>
+        </div>
+        <div class="dp-grid">
+          ${DAYS_UA.map(d => `<div class="dp-dow">${d}</div>`).join('')}
+          ${cells.map(d => {
+            if (!d) return `<div class="dp-day empty"></div>`;
+            const isoDate = st.year + '-' + String(st.month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+            const cls = [
+              'dp-day',
+              isoDate === todayStr ? 'today' : '',
+              isoDate === selectedVal ? 'selected' : '',
+            ].filter(Boolean).join(' ');
+            return `<div class="${cls}" onclick="dpSelect('${fieldId}','${isoDate}')">${d}</div>`;
+          }).join('')}
+        </div>
+        <div class="dp-footer">
+          <button type="button" class="dp-today-btn" onclick="dpSelect('${fieldId}','${todayStr}')">Сьогодні</button>
+          <button type="button" class="dp-clear-btn" onclick="dpClear('${fieldId}')">Очистити</button>
+        </div>
+      `;
+    }
+
+    function dpMove(fieldId, dir) {
+      const st = dpState[fieldId];
+      if (!st) return;
+      st.month += dir;
+      if (st.month < 0) { st.month = 11; st.year--; }
+      if (st.month > 11) { st.month = 0; st.year++; }
+      renderDpGrid(fieldId);
+    }
+
+    function dpSelect(fieldId, isoDate) {
+      const btn = document.getElementById(fieldId);
+      if (!btn) return;
+      btn.dataset.value = isoDate;
+      const [y, m, d] = isoDate.split('-');
+      btn.querySelector('.dp-display').textContent = d + '.' + m + '.' + y;
+      dpState[fieldId] = { year: parseInt(y), month: parseInt(m) - 1 };
+      document.getElementById('dp_' + fieldId)?.classList.remove('open');
+    }
+
+    function dpClear(fieldId) {
+      const btn = document.getElementById(fieldId);
+      if (!btn) return;
+      btn.dataset.value = '';
+      btn.querySelector('.dp-display').textContent = 'Оберіть дату';
+      document.getElementById('dp_' + fieldId)?.classList.remove('open');
+    }
+
+    function setDatepickerValue(fieldId, isoDate) {
+      const btn = document.getElementById(fieldId);
+      if (!btn) return;
+      btn.dataset.value = isoDate || '';
+      if (isoDate) {
+        const [y, m, d] = isoDate.split('-');
+        const el = btn.querySelector('.dp-display');
+        if (el) el.textContent = d + '.' + m + '.' + y;
+      } else {
+        const el = btn.querySelector('.dp-display');
+        if (el) el.textContent = 'Оберіть дату';
+      }
+      if (dpState[fieldId]) {
+        const dt = isoDate ? new Date(isoDate + 'T00:00:00') : new Date();
+        dpState[fieldId] = { year: dt.getFullYear(), month: dt.getMonth() };
+      }
+    }
+
+    function getDatepickerValue(fieldId) {
+      const btn = document.getElementById(fieldId);
+      return btn?.dataset.value || '';
+    }
+
+    window.uploadLogo = uploadLogo;
+    window.removeLogo = removeLogo;
+    window.dpMove = dpMove;
+    window.dpSelect = dpSelect;
+    window.dpClear = dpClear;
+
+    // Init datepickers for task modal (stable IDs)
+    initDatepicker('taskDeadline');
+  </script>
+</body>
+</html>
