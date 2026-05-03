@@ -962,6 +962,7 @@
       <section class="page" id="special"></section>
       <section class="page" id="notes"></section>
       <section class="page" id="sessions"></section>
+      <section class="page" id="archive"></section>
       <section class="page" id="settings"></section>
     </main>
   </div>
@@ -1208,11 +1209,18 @@
         if (doc.exists) {
           const data = doc.data();
           delete data._updatedAt;
+          const prevSelectedId = selectedProjectId;
           state = migrateState(data);
-          selectedProjectId = state.projects[0]?.id || null;
+          // Preserve selectedProjectId if still valid, otherwise fall back to first
+          if (prevSelectedId && state.projects.find(p => p.id === prevSelectedId)) {
+            selectedProjectId = prevSelectedId;
+          } else {
+            selectedProjectId = state.projects[0]?.id || null;
+          }
           saveStateLocal();
           render();
           applyAppIdentity();
+          applyLogo();
           setSyncDot('ok');
         } else {
           // first time — write demo data
@@ -1275,6 +1283,7 @@
       ['special', 'sliders-horizontal', 'Special Specs', 'Тур-метадані, технічні параметри дизайну та чек-листи.'],
       ['notes', 'images', 'Нотатки й референси', 'Мудборди, прив’язка до етапів та візуальні посилання.'],
       ['sessions', 'calendar-check', 'Clarity Sessions', 'Щотижневе планування, перегляд пріоритетів і рішень.'],
+      ['archive', 'archive', 'Архів проєктів', 'Видалені проєкти — з можливістю відновлення або повного видалення.'],
       ['settings', 'settings', 'Налаштування', 'Домени, палітра та базові параметри системи.']
     ];
 
@@ -1355,6 +1364,8 @@
       next.tasks ||= [];
       next.notes ||= [];
       next.sessions ||= [];
+      next.archivedProjects ||= [];
+      next.agendaItems ||= ['Перевірити прострочені дедлайни', 'Оновити Health Score', 'Вибрати 3 головні задачі тижня', 'Зафіксувати рішення та наступні кроки'];
       next.tasks.forEach(task => {
         if (!['open', 'in_progress', 'blocked', 'on_hold', 'done'].includes(task.status)) task.status = task.done ? 'done' : 'open';
       });
@@ -1362,14 +1373,44 @@
       if (next.statusLabels) {
         Object.entries(next.statusLabels).forEach(([key, label]) => { if (STATUS_CONFIG[key]) STATUS_CONFIG[key].label = label; });
       }
-      // Migrate: projects without tabDefs get defaults; migrate legacy global projectTabDefs
+      // Migrate: projects without tabDefs get empty array; migrate legacy global projectTabDefs and legacy specs/tour
       next.projects.forEach(p => {
         if (!p.tabDefs) {
-          // If global tabDefs existed, copy them; otherwise use defaults
-          p.tabDefs = next.projectTabDefs
-            ? JSON.parse(JSON.stringify(next.projectTabDefs))
-            : DEFAULT_TAB_DEFS();
-          // Migrate legacy specs/tour into customTabs if present
+          if (next.projectTabDefs) {
+            // One-time migration from old global tabDefs
+            p.tabDefs = JSON.parse(JSON.stringify(next.projectTabDefs));
+          } else if (p.specs || p.tour) {
+            // Legacy project with specs/tour data — migrate into tabs so data isn't lost
+            p.tabDefs = [];
+            if (p.specs) {
+              p.tabDefs.push({
+                id: 'specs', label: 'Дизайн-специфікація',
+                fields: [
+                  { id:'specSize',     label:'Формат / Розмір',    type:'text',     placeholder:'A3 / 300 DPI' },
+                  { id:'specColor',    label:'Колірний профіль',   type:'text',     placeholder:'CMYK FOGRA39, sRGB...' },
+                  { id:'specAffinity', label:'Програми',           type:'text',     placeholder:'Affinity Publisher + Designer' },
+                  { id:'specPrint',    label:'Особливості друку',  type:'text',     placeholder:'Gold foil, embossing, bleed 3mm' },
+                  { id:'specNotes',    label:'Нотатки',            type:'textarea', placeholder:'Шрифти, відступи, сітка...' },
+                ]
+              });
+            }
+            if (p.tour) {
+              p.tabDefs.push({
+                id: 'tour', label: 'Тур-метадані',
+                fields: [
+                  { id:'tourPledgeType',    label:'Тип застави',       type:'text',     placeholder:'30% депозит...' },
+                  { id:'tourCancellation',  label:'Умови ануляції',    type:'text',     placeholder:'Без штрафу до 21 дня...' },
+                  { id:'tourDates',         label:'Дати туру',         type:'text',     placeholder:'12–22 червня 2025' },
+                  { id:'tourCapacity',      label:'Місткість / Група', type:'text',     placeholder:'12 осіб, мінімум 8' },
+                  { id:'tourChecklist',     label:'Чек-лист',          type:'textarea', placeholder:'Готелі, трансфери, ваучери...' },
+                ]
+              });
+            }
+          } else {
+            // Fresh project — no tabs by default
+            p.tabDefs = [];
+          }
+          // Migrate legacy specs/tour data into customTabs
           if (!p.customTabs) p.customTabs = {};
           if (p.specs && !p.customTabs.specs) {
             p.customTabs.specs = {
@@ -1462,7 +1503,12 @@
     function setHeader(route) {
       const item = routes.find(r => r[0] === route) || routes[0];
       document.getElementById('pageTitle').textContent = item[2];
-      document.getElementById('pageSubtitle').textContent = item[3];
+      // Use custom pageSubtitle for board if set
+      if (route === 'board' && state.pageSubtitle) {
+        document.getElementById('pageSubtitle').textContent = state.pageSubtitle;
+      } else {
+        document.getElementById('pageSubtitle').textContent = item[3];
+      }
     }
 
     function render() {
@@ -1487,6 +1533,7 @@
         special: renderSpecial,
         notes: renderNotes,
         sessions: renderSessions,
+        archive: renderArchive,
         settings: renderSettings
       };
       (renderers[route] || renderBoard)();
@@ -2151,6 +2198,7 @@
     }
 
     function renderSessions() {
+      const SESSION_STATUSES = ['Заплановано', 'В процесі', 'Завершено', 'Скасовано'];
       document.getElementById('sessions').innerHTML = `
         <div class="grid wide-grid">
           <div class="card pad">
@@ -2169,20 +2217,37 @@
             </form>
             ${state.sessions.length ? state.sessions.map(s => {
               const d = new Date(s.date + 'T12:00:00');
+              const statusCls = s.result === 'Завершено' ? 'mint' : s.result === 'В процесі' ? 'gold' : s.result === 'Скасовано' ? 'danger' : 'warning';
               return `
                 <div class="session-row">
                   <div class="date-box"><strong>${d.getDate()}</strong><span>${d.toLocaleDateString('uk-UA', { month: 'short' })}</span></div>
-                  <div><strong>${s.title}</strong><div class="muted tiny">${s.focus}</div></div>
-                  <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end"><span class="pill mint">${s.result}</span><button class="btn icon-btn btn-danger" onclick="deleteSession('${s.id}')" title="Видалити сесію"><i data-lucide="trash-2"></i></button></div>
+                  <div><strong>${escapeHTML(s.title)}</strong><div class="muted tiny">${escapeHTML(s.focus)}</div></div>
+                  <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+                    <select class="pill ${statusCls}" style="border:none;background:transparent;cursor:pointer;font-size:12px;padding:0 4px" onchange="updateSessionStatus('${s.id}', this.value)">
+                      ${SESSION_STATUSES.map(st => `<option value="${st}" ${s.result === st ? 'selected' : ''}>${st}</option>`).join('')}
+                    </select>
+                    <button class="btn icon-btn btn-danger" onclick="deleteSession('${s.id}')" title="Видалити сесію"><i data-lucide="trash-2"></i></button>
+                  </div>
                 </div>
               `;
             }).join('') : `<div class="note-card"><h3>Сесій ще немає</h3><p class="muted">Додайте першу Clarity Session і зафіксуйте фокус тижня.</p></div>`}
           </div>
           <div class="card pad">
-            <div class="eyebrow">Agenda</div>
-            <h2 class="card-title">Шаблон сесії</h2>
-            <div style="margin-top:14px;display:grid;gap:10px">
-              ${['Перевірити прострочені дедлайни', 'Оновити Health Score', 'Вибрати 3 головні задачі тижня', 'Зафіксувати рішення та наступні кроки'].map(item => `<div class="mini-task">${item}</div>`).join('')}
+            <div class="card-header">
+              <div>
+                <div class="eyebrow">Agenda</div>
+                <h2 class="card-title">Шаблон сесії</h2>
+              </div>
+              <button class="btn btn-ghost" style="font-size:12px" onclick="addAgendaItem()"><i data-lucide="plus"></i> Пункт</button>
+            </div>
+            <div style="margin-top:4px;display:grid;gap:8px">
+              ${(state.agendaItems || []).map((item, idx) => `
+                <div class="mini-task" style="display:flex;align-items:center;gap:8px">
+                  <span style="flex:1">${escapeHTML(item)}</span>
+                  <button class="btn icon-btn" style="width:24px;height:24px;font-size:11px" title="Редагувати" onclick="editAgendaItem(${idx})"><i data-lucide="pencil"></i></button>
+                  <button class="btn icon-btn btn-danger" style="width:24px;height:24px;font-size:11px" title="Видалити" onclick="removeAgendaItem(${idx})"><i data-lucide="trash-2"></i></button>
+                </div>
+              `).join('')}
             </div>
           </div>
         </div>
@@ -2193,6 +2258,86 @@
         event.preventDefault();
         addSession();
       });
+    }
+
+    function updateSessionStatus(id, status) {
+      const session = state.sessions.find(s => s.id === id);
+      if (!session) return;
+      session.result = status;
+      saveState();
+      showToast('Статус сесії оновлено.');
+      renderSessions();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function addAgendaItem() {
+      const label = window.prompt('Новий пункт agenda:');
+      if (!label || !label.trim()) return;
+      state.agendaItems ||= [];
+      state.agendaItems.push(label.trim());
+      saveState();
+      renderSessions();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function editAgendaItem(idx) {
+      state.agendaItems ||= [];
+      const current = state.agendaItems[idx] || '';
+      const label = window.prompt('Редагувати пункт:', current);
+      if (label === null) return;
+      if (!label.trim()) return removeAgendaItem(idx);
+      state.agendaItems[idx] = label.trim();
+      saveState();
+      renderSessions();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function removeAgendaItem(idx) {
+      state.agendaItems ||= [];
+      state.agendaItems.splice(idx, 1);
+      saveState();
+      renderSessions();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function renderArchive() {
+      const archived = state.archivedProjects || [];
+      document.getElementById('archive').innerHTML = `
+        <div class="card pad">
+          <div class="card-header">
+            <div>
+              <div class="eyebrow">Archive</div>
+              <h2 class="card-title">Архів проєктів</h2>
+              <p class="muted tiny">Видалені проєкти зберігаються тут. Можна відновити або остаточно видалити.</p>
+            </div>
+          </div>
+          ${archived.length ? archived.map(p => {
+            const taskCount = (p._relatedTaskIds || []).length;
+            const noteCount = (p._relatedNoteIds || []).length;
+            return `
+              <div class="task-row" style="cursor:default">
+                <div class="metric-icon" style="background:var(--mint-2);flex-shrink:0">
+                  <i data-lucide="archive" style="width:16px;height:16px"></i>
+                </div>
+                <div>
+                  <div class="task-title">${escapeHTML(p.title)}</div>
+                  <div class="task-meta">
+                    <span>${escapeHTML(p.domain || '')}</span>
+                    ${taskCount ? `<span>${taskCount} задач</span>` : ''}
+                    ${noteCount ? `<span>${noteCount} нотаток</span>` : ''}
+                    <span>Архівовано: ${formatDate(p._archivedAt || '')}</span>
+                  </div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+                  <button class="btn" onclick="restoreProject('${p.id}')" title="Відновити проєкт"><i data-lucide="undo-2"></i> Відновити</button>
+                  <button class="btn btn-danger icon-btn" onclick="permanentlyDeleteProject('${p.id}')" title="Видалити назавжди"><i data-lucide="trash-2"></i></button>
+                </div>
+              </div>
+            `;
+          }).join('') : `<div class="note-card" style="text-align:center;padding:32px"><h3>Архів порожній</h3><p class="muted">Видалені проєкти з'являться тут.</p></div>`}
+        </div>
+      `;
+      requestAnimationFrame(renderIcons);
     }
 
     function renderSettings() {
@@ -2271,9 +2416,13 @@
                 <label>Назва застосунку</label>
                 <input id="settingsAppName" value="${escapeHTML(appName)}" placeholder="Clarity">
               </div>
-              <div class="field" style="margin-bottom:14px">
-                <label>Підзаголовок</label>
+              <div class="field" style="margin-bottom:10px">
+                <label>Підзаголовок у сайдбарі</label>
                 <input id="settingsAppSubtitle" value="${escapeHTML(appSubtitle)}" placeholder="Personal project ecosystem">
+              </div>
+              <div class="field" style="margin-bottom:14px">
+                <label>Підпис під заголовком сторінки (Board)</label>
+                <input id="settingsPageSubtitle" value="${escapeHTML(state.pageSubtitle || '')}" placeholder="Справи, проєкти, дедлайни та спокійний контроль...">
               </div>
               <button class="btn btn-primary" onclick="saveAppIdentity()"><i data-lucide="save"></i> Зберегти</button>
             </div>
@@ -2427,10 +2576,14 @@
     function saveAppIdentity() {
       const name = document.getElementById('settingsAppName')?.value.trim();
       const subtitle = document.getElementById('settingsAppSubtitle')?.value.trim();
+      const pageSubtitle = document.getElementById('settingsPageSubtitle')?.value.trim();
       if (name) { state.appName = name; document.querySelector('.brand-title').textContent = name; document.title = name + ' — Project Management'; }
       if (subtitle) { state.appSubtitle = subtitle; document.querySelector('.brand-subtitle').textContent = subtitle; }
+      if (pageSubtitle !== undefined) state.pageSubtitle = pageSubtitle;
       saveState();
-      showToast('Назву застосунку збережено.');
+      showToast('Налаштування застосунку збережено.');
+      // Refresh subtitle display if on board
+      if (currentRoute() === 'board') setHeader('board');
     }
 
     function uploadLogo(event) {
@@ -2513,38 +2666,14 @@
     // Extra tabs are stored in state.projectTabDefs: [{id, label, fields:[{id,label,type,placeholder}]}]
     // field types: 'text' | 'textarea'
 
-    // Default tab templates (used when creating a new project)
-    const DEFAULT_TAB_DEFS = () => [
-      {
-        id: 'specs', label: 'Дизайн-специфікація',
-        fields: [
-          { id:'specSize',     label:'Формат / Розмір',    type:'text',     placeholder:'A3 / 300 DPI' },
-          { id:'specColor',    label:'Колірний профіль',   type:'text',     placeholder:'CMYK FOGRA39, sRGB...' },
-          { id:'specAffinity', label:'Програми',           type:'text',     placeholder:'Affinity Publisher + Designer' },
-          { id:'specPrint',    label:'Особливості друку',  type:'text',     placeholder:'Gold foil, embossing, bleed 3mm' },
-          { id:'specNotes',    label:'Нотатки',            type:'textarea', placeholder:'Шрифти, відступи, сітка...' },
-        ]
-      },
-      {
-        id: 'tour', label: 'Тур-метадані',
-        fields: [
-          { id:'tourPledgeType',    label:'Тип застави',       type:'text',     placeholder:'30% депозит...' },
-          { id:'tourCancellation',  label:'Умови ануляції',    type:'text',     placeholder:'Без штрафу до 21 дня...' },
-          { id:'tourDates',         label:'Дати туру',         type:'text',     placeholder:'12–22 червня 2025' },
-          { id:'tourCapacity',      label:'Місткість / Група', type:'text',     placeholder:'12 осіб, мінімум 8' },
-          { id:'tourChecklist',     label:'Чек-лист',          type:'textarea', placeholder:'Готелі, трансфери, ваучери...' },
-        ]
-      }
-    ];
-
     // Per-project tab defs: stored in project.tabDefs
     function getProjectTabDefs(project) {
       if (!project) {
         // new project being created — use temp store
         if (window._newProjectTabDefs) return window._newProjectTabDefs;
-        return DEFAULT_TAB_DEFS();
+        return [];
       }
-      if (!project.tabDefs) project.tabDefs = DEFAULT_TAB_DEFS();
+      if (!project.tabDefs) project.tabDefs = [];
       return project.tabDefs;
     }
 
@@ -2626,6 +2755,7 @@
       const id = 'tab_' + uid();
       tabDefs.push({ id, label: label.trim(), fields: [] });
       if (project) { project.tabDefs = tabDefs; saveState(); }
+      else { window._newProjectTabDefs = tabDefs; }
       renderProjectModalTabs(id);
       switchProjectTab(id);
       showToast('Вкладку «' + label.trim() + '» додано.');
@@ -2638,12 +2768,15 @@
       const tab = tabDefs.find(t => t.id === tabId);
       if (!tab) return;
       if (!confirm('Видалити вкладку «' + tab.label + '»? Усі поля цієї вкладки буде видалено.')) return;
+      const filtered = tabDefs.filter(t => t.id !== tabId);
       if (project) {
-        project.tabDefs = tabDefs.filter(t => t.id !== tabId);
-        // Remove field data only from this project
+        project.tabDefs = filtered;
         tab.fields.forEach(f => { delete project['_' + f.id]; });
         if (project.customTabs) delete project.customTabs[tabId];
         saveState();
+      } else {
+        // New project not yet saved — update the temp store directly
+        window._newProjectTabDefs = filtered;
       }
       renderProjectModalTabs('base');
       switchProjectTab('base');
@@ -2659,6 +2792,7 @@
       if (!label || !label.trim()) return;
       tab.label = label.trim();
       if (project) { project.tabDefs = tabDefs; saveState(); }
+      else { window._newProjectTabDefs = tabDefs; }
       renderProjectModalTabs(tabId);
       showToast('Вкладку перейменовано.');
     }
@@ -2679,6 +2813,7 @@
         placeholder: ''
       });
       if (project) { project.tabDefs = tabDefs; saveState(); }
+      else { window._newProjectTabDefs = tabDefs; }
       renderProjectModalTabs(tabId);
       switchProjectTab(tabId);
       showToast('Поле «' + label.trim() + '» додано.');
@@ -2691,6 +2826,7 @@
       if (!tab) return;
       tab.fields = tab.fields.filter(f => f.id !== fieldId);
       if (project) { project.tabDefs = tabDefs; saveState(); }
+      else { window._newProjectTabDefs = tabDefs; }
       renderProjectModalTabs(tabId);
       switchProjectTab(tabId);
     }
@@ -2702,14 +2838,12 @@
       // Set projectId first so getEditingProject() works inside renderProjectModalTabs
       document.getElementById('projectId').value = project?.id || '';
 
-      // For new projects: seed default tabs so modal shows them immediately
-      // (they are saved to the project object on first save)
+      // For new projects: start with empty tabs
       if (!project) {
-        // temp object for rendering tabs only — not pushed to state yet
-        window._newProjectTabDefs = DEFAULT_TAB_DEFS();
+        window._newProjectTabDefs = [];
       } else {
         window._newProjectTabDefs = null;
-        if (!project.tabDefs) project.tabDefs = DEFAULT_TAB_DEFS();
+        if (!project.tabDefs) project.tabDefs = [];
       }
 
       // Render tabs (uses getEditingProject / _newProjectTabDefs)
@@ -2808,13 +2942,50 @@
       const parts = [];
       if (relatedTasks) parts.push(relatedTasks + '\u00a0задач');
       if (relatedNotes) parts.push(relatedNotes + '\u00a0нотаток');
-      const msg = parts.length ? 'Разом буде видалено: ' + parts.join(', ') + '.' : 'Пов\'язаних даних немає.';
-      if (!confirm('Видалити проєкт «' + project.title + '»?\n\n' + msg)) return;
+      const msg = parts.length ? 'Пов\'язані дані (' + parts.join(', ') + ') залишаться в архіві.' : 'Пов\'язаних даних немає.';
+      if (!confirm('Перемістити проєкт «' + project.title + '» до архіву?\n\n' + msg)) return;
+      // Move to archive
+      state.archivedProjects ||= [];
+      state.archivedProjects.unshift({ ...project, _archivedAt: todayISO(), _relatedTaskIds: state.tasks.filter(t => t.projectId === id).map(t => t.id), _relatedNoteIds: state.notes.filter(n => n.projectId === id).map(n => n.id) });
       state.projects = state.projects.filter(p => p.id !== id);
-      state.tasks = state.tasks.filter(t => t.projectId !== id);
-      state.notes = state.notes.filter(n => n.projectId !== id);
+      // Keep tasks/notes but mark them as archived
+      state.tasks.filter(t => t.projectId === id).forEach(t => t._archived = true);
+      state.notes.filter(n => n.projectId === id).forEach(n => n._archived = true);
       selectedProjectId = state.projects[0]?.id || null;
-      showToast('Проєкт і пов\'язані дані видалено.');
+      saveState();
+      showToast('Проєкт переміщено до архіву.');
+      rerenderActive();
+    }
+
+    function restoreProject(id) {
+      const project = state.archivedProjects?.find(p => p.id === id);
+      if (!project) return;
+      if (!confirm('Відновити проєкт «' + project.title + '»?')) return;
+      const taskIds = project._relatedTaskIds || [];
+      const noteIds = project._relatedNoteIds || [];
+      const { _archivedAt, _relatedTaskIds, _relatedNoteIds, ...cleanProject } = project;
+      state.projects.push(cleanProject);
+      state.archivedProjects = state.archivedProjects.filter(p => p.id !== id);
+      // Restore related tasks/notes
+      state.tasks.filter(t => taskIds.includes(t.id)).forEach(t => delete t._archived);
+      state.notes.filter(n => noteIds.includes(n.id)).forEach(n => delete n._archived);
+      selectedProjectId = id;
+      saveState();
+      showToast('Проєкт «' + cleanProject.title + '» відновлено.');
+      rerenderActive();
+    }
+
+    function permanentlyDeleteProject(id) {
+      const project = state.archivedProjects?.find(p => p.id === id);
+      if (!project) return;
+      const taskIds = project._relatedTaskIds || [];
+      const noteIds = project._relatedNoteIds || [];
+      if (!confirm('Повністю видалити «' + project.title + '»?\nЦе незворотно. Усі пов\'язані задачі та нотатки також буде видалено.')) return;
+      state.archivedProjects = state.archivedProjects.filter(p => p.id !== id);
+      state.tasks = state.tasks.filter(t => !taskIds.includes(t.id));
+      state.notes = state.notes.filter(n => !noteIds.includes(n.id));
+      saveState();
+      showToast('Проєкт остаточно видалено.');
       rerenderActive();
     }
 
@@ -2921,7 +3092,7 @@
       // Save per-project tabDefs (structure) + collect field values
       const srcTabDefs = previous
         ? getProjectTabDefs(previous)
-        : (window._newProjectTabDefs || DEFAULT_TAB_DEFS());
+        : (window._newProjectTabDefs || []);
       project.tabDefs = srcTabDefs;
       window._newProjectTabDefs = null;
 
@@ -3021,6 +3192,12 @@
     window.toggleTask = toggleTask;
     window.deleteTask = deleteTask;
     window.deleteProject = deleteProject;
+    window.restoreProject = restoreProject;
+    window.permanentlyDeleteProject = permanentlyDeleteProject;
+    window.updateSessionStatus = updateSessionStatus;
+    window.addAgendaItem = addAgendaItem;
+    window.editAgendaItem = editAgendaItem;
+    window.removeAgendaItem = removeAgendaItem;
     window.dropTaskToMatrix = dropTaskToMatrix;
     // ── Project card drag-and-drop ──────────────────────────────────────────
     let _dragProjectId = null;
