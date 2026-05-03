@@ -1331,6 +1331,33 @@
       if (next.statusLabels) {
         Object.entries(next.statusLabels).forEach(([key, label]) => { if (STATUS_CONFIG[key]) STATUS_CONFIG[key].label = label; });
       }
+      // Migrate: projects without tabDefs get defaults; migrate legacy global projectTabDefs
+      next.projects.forEach(p => {
+        if (!p.tabDefs) {
+          // If global tabDefs existed, copy them; otherwise use defaults
+          p.tabDefs = next.projectTabDefs
+            ? JSON.parse(JSON.stringify(next.projectTabDefs))
+            : DEFAULT_TAB_DEFS();
+          // Migrate legacy specs/tour into customTabs if present
+          if (!p.customTabs) p.customTabs = {};
+          if (p.specs && !p.customTabs.specs) {
+            p.customTabs.specs = {
+              specSize: p.specs.size || '', specColor: p.specs.color || '',
+              specAffinity: p.specs.affinity || '', specPrint: p.specs.print || '',
+              specNotes: p.specs.notes || ''
+            };
+          }
+          if (p.tour && !p.customTabs.tour) {
+            p.customTabs.tour = {
+              tourPledgeType: p.tour.pledgeType || '', tourCancellation: p.tour.cancellation || '',
+              tourDates: p.tour.dates || '', tourCapacity: p.tour.capacity || '',
+              tourChecklist: p.tour.checklist || ''
+            };
+          }
+        }
+      });
+      // Remove legacy global projectTabDefs (no longer used)
+      delete next.projectTabDefs;
       return next;
     }
 
@@ -1983,67 +2010,67 @@
     }
 
     function renderSpecial() {
-      const tourProjects = state.projects.filter(p => p.tour);
-      const designProjects = state.projects.filter(p => p.specs);
-      const noTour = !tourProjects.length;
-      const noSpecs = !designProjects.length;
+      const p = state.projects.find(pr => pr.id === selectedProjectId) || state.projects[0] || null;
+      const noProject = !p;
+
+      // Project selector pills
+      const projectSelector = state.projects.length > 1 ? `
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+          ${state.projects.map(pr => `
+            <button class="quick-chip${pr.id === (p && p.id) ? ' active' : ''}"
+              onclick="selectedProjectId='${pr.id}';renderSpecial()">
+              ${escapeHTML(pr.title)}
+            </button>`).join('')}
+        </div>` : '';
+
+      // Render all custom tabs of the selected project
+      function renderCustomTabsForProject(proj) {
+        if (!proj) return '';
+        const tabDefs = getProjectTabDefs(proj);
+        if (!tabDefs.length) return '<div class="muted tiny" style="padding:8px 0">Немає вкладок. Додайте їх у редагуванні проєкту.</div>';
+        return tabDefs.map(tab => {
+          const data = proj.customTabs?.[tab.id] || {};
+          const textFields = tab.fields.filter(f => f.type === 'text');
+          const textareaFields = tab.fields.filter(f => f.type === 'textarea');
+          const hasAnyData = tab.fields.some(f => data[f.id]);
+          return `
+            <div class="note-card" style="margin-bottom:10px">
+              <div class="eyebrow" style="margin-bottom:8px">${escapeHTML(tab.label)}</div>
+              ${!hasAnyData ? '<p class="muted tiny">Дані ще не заповнені. Натисніть «Редагувати», щоб додати.</p>' : `
+                <div class="grid grid-2" style="gap:10px">
+                  ${textFields.filter(f => data[f.id]).map(f => `
+                    <div><span class="muted tiny">${escapeHTML(f.label)}</span><br><strong>${escapeHTML(data[f.id])}</strong></div>`).join('')}
+                </div>
+                ${textareaFields.filter(f => data[f.id]).map(f => `
+                  <div style="margin-top:10px"><span class="muted tiny">${escapeHTML(f.label)}</span><br>
+                  <span style="font-size:13px;line-height:1.6;white-space:pre-wrap">${escapeHTML(data[f.id])}</span></div>`).join('')}
+              `}
+            </div>`;
+        }).join('');
+      }
+
       document.getElementById('special').innerHTML = `
-        <div class="grid grid-2">
-          <div class="card pad">
-            <div class="card-header">
-              <div><div class="eyebrow">Tour Operator</div><h2 class="card-title">Метадані турів</h2></div>
-              <button class="btn" onclick="navigate('projects')"><i data-lucide="plus"></i> Проєкт</button>
+        <div class="card pad" style="margin-bottom:16px">
+          <div class="card-header">
+            <div>
+              <div class="eyebrow">Special Specs</div>
+              <h2 class="card-title">${p ? escapeHTML(p.title) : 'Виберіть проєкт'}</h2>
+              ${p ? `<p class="muted tiny" style="margin:4px 0 0">${escapeHTML(p.stage || '')}${p.domain ? ' · ' + escapeHTML(p.domain) : ''}</p>` : ''}
             </div>
-            ${noTour ? `
-              <div class="note-card" style="text-align:center;padding:32px">
-                <h3>Тур-метаданих ще немає</h3>
-                <p class="muted" style="line-height:1.6;margin-top:8px">Відкрийте або створіть проєкт і заповніть вкладку <strong>«Тур-метадані»</strong> у формі редагування.</p>
-                <button class="btn btn-primary" style="margin-top:14px" onclick="openProjectModal()"><i data-lucide="plus"></i> Новий проєкт</button>
-              </div>` :
-              tourProjects.map(p => `
-              <div class="note-card" style="margin-bottom:10px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                  <h3 style="margin:0">${escapeHTML(p.title)}</h3>
-                  <button class="btn" onclick="openProjectModal('${p.id}')"><i data-lucide="sliders-horizontal"></i> Редагувати</button>
-                </div>
-                <div class="grid grid-2" style="gap:10px">
-                  ${p.tour.pledgeType ? `<div><span class="muted tiny">Тип застави</span><br><strong>${escapeHTML(p.tour.pledgeType)}</strong></div>` : ''}
-                  ${p.tour.dates ? `<div><span class="muted tiny">Дати туру</span><br><strong>${escapeHTML(p.tour.dates)}</strong></div>` : ''}
-                  ${p.tour.cancellation ? `<div><span class="muted tiny">Ануляція</span><br><strong>${escapeHTML(p.tour.cancellation)}</strong></div>` : ''}
-                  ${p.tour.capacity ? `<div><span class="muted tiny">Місткість</span><br><strong>${escapeHTML(p.tour.capacity)}</strong></div>` : ''}
-                </div>
-                ${p.tour.checklist ? `<div style="margin-top:10px"><span class="muted tiny">Чек-лист</span><br><span style="font-size:13px;line-height:1.6">${escapeHTML(p.tour.checklist)}</span></div>` : ''}
-              </div>
-            `).join('')}
-          </div>
-          <div class="card pad">
-            <div class="card-header">
-              <div><div class="eyebrow">Design Specs</div><h2 class="card-title">Технічні параметри дизайну</h2></div>
-              <button class="btn" onclick="navigate('projects')"><i data-lucide="plus"></i> Проєкт</button>
+            <div class="actions">
+              ${p ? `<button class="btn btn-primary" onclick="openProjectModal('${p.id}')"><i data-lucide="sliders-horizontal"></i> Редагувати</button>` : ''}
+              <button class="btn" onclick="openProjectModal()"><i data-lucide="plus"></i> Новий проєкт</button>
             </div>
-            ${noSpecs ? `
-              <div class="note-card" style="text-align:center;padding:32px">
-                <h3>Специфікацій ще немає</h3>
-                <p class="muted" style="line-height:1.6;margin-top:8px">Відкрийте або створіть проєкт і заповніть вкладку <strong>«Дизайн-специфікація»</strong> у формі редагування.</p>
-                <button class="btn btn-primary" style="margin-top:14px" onclick="openProjectModal()"><i data-lucide="plus"></i> Новий проєкт</button>
-              </div>` :
-              designProjects.map(p => `
-              <div class="note-card" style="margin-bottom:10px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                  <h3 style="margin:0">${escapeHTML(p.title)}</h3>
-                  <button class="btn" onclick="openProjectModal('${p.id}')"><i data-lucide="sliders-horizontal"></i> Редагувати</button>
-                </div>
-                <div class="grid grid-2" style="gap:10px">
-                  ${p.specs.size ? `<div><span class="muted tiny">Формат / Розмір</span><br><strong>${escapeHTML(p.specs.size)}</strong></div>` : ''}
-                  ${p.specs.color ? `<div><span class="muted tiny">Колірний профіль</span><br><strong>${escapeHTML(p.specs.color)}</strong></div>` : ''}
-                  ${p.specs.affinity ? `<div><span class="muted tiny">Програми</span><br><strong>${escapeHTML(p.specs.affinity)}</strong></div>` : ''}
-                  ${p.specs.print ? `<div><span class="muted tiny">Друк</span><br><strong>${escapeHTML(p.specs.print)}</strong></div>` : ''}
-                </div>
-                ${p.specs.notes ? `<div style="margin-top:10px"><span class="muted tiny">Нотатки</span><br><span style="font-size:13px;line-height:1.6">${escapeHTML(p.specs.notes)}</span></div>` : ''}
-              </div>
-            `).join('')}
           </div>
+          ${projectSelector}
         </div>
+        ${noProject ? `
+          <div class="note-card" style="text-align:center;padding:32px">
+            <h3>Проєктів ще немає</h3>
+            <p class="muted">Натисніть «Новий проєкт», щоб розпочати.</p>
+          </div>` :
+          renderCustomTabsForProject(p)
+        }
       `;
     }
 
@@ -2441,34 +2468,50 @@
     // Extra tabs are stored in state.projectTabDefs: [{id, label, fields:[{id,label,type,placeholder}]}]
     // field types: 'text' | 'textarea'
 
-    function getProjectTabDefs() {
-      if (!state.projectTabDefs) state.projectTabDefs = [
-        {
-          id: 'specs', label: 'Дизайн-специфікація',
-          fields: [
-            { id:'specSize',     label:'Формат / Розмір',    type:'text',     placeholder:'A3 / 300 DPI' },
-            { id:'specColor',    label:'Колірний профіль',   type:'text',     placeholder:'CMYK FOGRA39, sRGB...' },
-            { id:'specAffinity', label:'Програми',           type:'text',     placeholder:'Affinity Publisher + Designer' },
-            { id:'specPrint',    label:'Особливості друку',  type:'text',     placeholder:'Gold foil, embossing, bleed 3mm' },
-            { id:'specNotes',    label:'Нотатки',            type:'textarea', placeholder:'Шрифти, відступи, сітка...' },
-          ]
-        },
-        {
-          id: 'tour', label: 'Тур-метадані',
-          fields: [
-            { id:'tourPledgeType',    label:'Тип застави',       type:'text',     placeholder:'30% депозит...' },
-            { id:'tourCancellation',  label:'Умови ануляції',    type:'text',     placeholder:'Без штрафу до 21 дня...' },
-            { id:'tourDates',         label:'Дати туру',         type:'text',     placeholder:'12–22 червня 2025' },
-            { id:'tourCapacity',      label:'Місткість / Група', type:'text',     placeholder:'12 осіб, мінімум 8' },
-            { id:'tourChecklist',     label:'Чек-лист',          type:'textarea', placeholder:'Готелі, трансфери, ваучери...' },
-          ]
-        }
-      ];
-      return state.projectTabDefs;
+    // Default tab templates (used when creating a new project)
+    const DEFAULT_TAB_DEFS = () => [
+      {
+        id: 'specs', label: 'Дизайн-специфікація',
+        fields: [
+          { id:'specSize',     label:'Формат / Розмір',    type:'text',     placeholder:'A3 / 300 DPI' },
+          { id:'specColor',    label:'Колірний профіль',   type:'text',     placeholder:'CMYK FOGRA39, sRGB...' },
+          { id:'specAffinity', label:'Програми',           type:'text',     placeholder:'Affinity Publisher + Designer' },
+          { id:'specPrint',    label:'Особливості друку',  type:'text',     placeholder:'Gold foil, embossing, bleed 3mm' },
+          { id:'specNotes',    label:'Нотатки',            type:'textarea', placeholder:'Шрифти, відступи, сітка...' },
+        ]
+      },
+      {
+        id: 'tour', label: 'Тур-метадані',
+        fields: [
+          { id:'tourPledgeType',    label:'Тип застави',       type:'text',     placeholder:'30% депозит...' },
+          { id:'tourCancellation',  label:'Умови ануляції',    type:'text',     placeholder:'Без штрафу до 21 дня...' },
+          { id:'tourDates',         label:'Дати туру',         type:'text',     placeholder:'12–22 червня 2025' },
+          { id:'tourCapacity',      label:'Місткість / Група', type:'text',     placeholder:'12 осіб, мінімум 8' },
+          { id:'tourChecklist',     label:'Чек-лист',          type:'textarea', placeholder:'Готелі, трансфери, ваучери...' },
+        ]
+      }
+    ];
+
+    // Per-project tab defs: stored in project.tabDefs
+    function getProjectTabDefs(project) {
+      if (!project) {
+        // new project being created — use temp store
+        if (window._newProjectTabDefs) return window._newProjectTabDefs;
+        return DEFAULT_TAB_DEFS();
+      }
+      if (!project.tabDefs) project.tabDefs = DEFAULT_TAB_DEFS();
+      return project.tabDefs;
+    }
+
+    // Helper: get project being edited in modal
+    function getEditingProject() {
+      const id = document.getElementById('projectId')?.value;
+      return id ? state.projects.find(p => p.id === id) : null;
     }
 
     function renderProjectModalTabs(activeTab = 'base') {
-      const tabDefs = getProjectTabDefs();
+      const project = getEditingProject();
+      const tabDefs = getProjectTabDefs(project);
       const bar = document.getElementById('projTabsBar');
       const extraPanels = document.getElementById('projExtraPanels');
       if (!bar || !extraPanels) return;
@@ -2533,11 +2576,11 @@
     function addProjectTabPrompt() {
       const label = window.prompt('Назва нової вкладки:');
       if (!label || !label.trim()) return;
-      const tabDefs = getProjectTabDefs();
+      const project = getEditingProject();
+      const tabDefs = getProjectTabDefs(project);
       const id = 'tab_' + uid();
       tabDefs.push({ id, label: label.trim(), fields: [] });
-      state.projectTabDefs = tabDefs;
-      saveState();
+      if (project) { project.tabDefs = tabDefs; saveState(); }
       renderProjectModalTabs(id);
       switchProjectTab(id);
       showToast('Вкладку «' + label.trim() + '» додано.');
@@ -2545,37 +2588,39 @@
 
     function removeProjectTab(tabId, event) {
       event.stopPropagation();
-      const tabDefs = getProjectTabDefs();
+      const project = getEditingProject();
+      const tabDefs = getProjectTabDefs(project);
       const tab = tabDefs.find(t => t.id === tabId);
       if (!tab) return;
       if (!confirm('Видалити вкладку «' + tab.label + '»? Усі поля цієї вкладки буде видалено.')) return;
-      state.projectTabDefs = tabDefs.filter(t => t.id !== tabId);
-      // Remove all field data from all projects
-      state.projects.forEach(p => {
-        tab.fields.forEach(f => { delete p['_'+f.id]; });
-        if (p.customTabs) delete p.customTabs[tabId];
-      });
-      saveState();
+      if (project) {
+        project.tabDefs = tabDefs.filter(t => t.id !== tabId);
+        // Remove field data only from this project
+        tab.fields.forEach(f => { delete project['_' + f.id]; });
+        if (project.customTabs) delete project.customTabs[tabId];
+        saveState();
+      }
       renderProjectModalTabs('base');
       switchProjectTab('base');
       showToast('Вкладку видалено.');
     }
 
     function editProjectTabLabel(tabId) {
-      const tabDefs = getProjectTabDefs();
+      const project = getEditingProject();
+      const tabDefs = getProjectTabDefs(project);
       const tab = tabDefs.find(t => t.id === tabId);
       if (!tab) return;
       const label = window.prompt('Нова назва вкладки:', tab.label);
       if (!label || !label.trim()) return;
       tab.label = label.trim();
-      state.projectTabDefs = tabDefs;
-      saveState();
+      if (project) { project.tabDefs = tabDefs; saveState(); }
       renderProjectModalTabs(tabId);
       showToast('Вкладку перейменовано.');
     }
 
     function addFieldToTab(tabId) {
-      const tabDefs = getProjectTabDefs();
+      const project = getEditingProject();
+      const tabDefs = getProjectTabDefs(project);
       const tab = tabDefs.find(t => t.id === tabId);
       if (!tab) return;
       const label = window.prompt('Назва нового поля:');
@@ -2588,20 +2633,19 @@
         type: typeChoice ? 'text' : 'textarea',
         placeholder: ''
       });
-      state.projectTabDefs = tabDefs;
-      saveState();
+      if (project) { project.tabDefs = tabDefs; saveState(); }
       renderProjectModalTabs(tabId);
       switchProjectTab(tabId);
       showToast('Поле «' + label.trim() + '» додано.');
     }
 
     function removeTabField(tabId, fieldId) {
-      const tabDefs = getProjectTabDefs();
+      const project = getEditingProject();
+      const tabDefs = getProjectTabDefs(project);
       const tab = tabDefs.find(t => t.id === tabId);
       if (!tab) return;
       tab.fields = tab.fields.filter(f => f.id !== fieldId);
-      state.projectTabDefs = tabDefs;
-      saveState();
+      if (project) { project.tabDefs = tabDefs; saveState(); }
       renderProjectModalTabs(tabId);
       switchProjectTab(tabId);
     }
@@ -2610,23 +2654,33 @@
       const project = state.projects.find(p => p.id === id);
       renderTaskProjectOptions();
       document.getElementById('projectModalTitle').textContent = project ? 'Редагувати проєкт' : 'Новий проєкт';
+      // Set projectId first so getEditingProject() works inside renderProjectModalTabs
       document.getElementById('projectId').value = project?.id || '';
 
-      // Render tabs first (builds input fields)
+      // For new projects: seed default tabs so modal shows them immediately
+      // (they are saved to the project object on first save)
+      if (!project) {
+        // temp object for rendering tabs only — not pushed to state yet
+        window._newProjectTabDefs = DEFAULT_TAB_DEFS();
+      } else {
+        window._newProjectTabDefs = null;
+        if (!project.tabDefs) project.tabDefs = DEFAULT_TAB_DEFS();
+      }
+
+      // Render tabs (uses getEditingProject / _newProjectTabDefs)
       renderProjectModalTabs('base');
 
       document.getElementById('projectTitle').value = project?.title || '';
       document.getElementById('projectDomain').value = project?.domain || state.domains[0]?.name || 'Дизайн';
       document.getElementById('projectStage').value = project?.stage || '';
-      // Datepicker
       setDatepickerValue('projectDue', project?.due || addDays(7));
       const colors = parseCoverColors(project?.cover);
       document.getElementById('projectCoverA').value = colors[0];
       document.getElementById('projectCoverB').value = colors[1];
       document.getElementById('projectDescription').value = project?.description || '';
 
-      // Fill extra tab fields
-      const tabDefs = getProjectTabDefs();
+      // Fill extra tab fields from project.customTabs
+      const tabDefs = project ? getProjectTabDefs(project) : (window._newProjectTabDefs || []);
       tabDefs.forEach(tab => {
         tab.fields.forEach(f => {
           const el = document.getElementById(f.id);
@@ -2636,13 +2690,9 @@
 
       updateCoverPreview();
       document.getElementById('projectModal').classList.add('open');
-
-      // Init datepicker for projectDue
       initDatepicker('projectDue');
-      // Re-init cover preview listeners (DOM was rebuilt)
       document.getElementById('projectCoverA').addEventListener('input', updateCoverPreview);
       document.getElementById('projectCoverB').addEventListener('input', updateCoverPreview);
-
       renderIcons();
     }
 
@@ -2823,9 +2873,14 @@
         customTabs: {}
       };
 
-      // Collect all dynamic tab field values
-      const tabDefs = getProjectTabDefs();
-      tabDefs.forEach(tab => {
+      // Save per-project tabDefs (structure) + collect field values
+      const srcTabDefs = previous
+        ? getProjectTabDefs(previous)
+        : (window._newProjectTabDefs || DEFAULT_TAB_DEFS());
+      project.tabDefs = srcTabDefs;
+      window._newProjectTabDefs = null;
+
+      srcTabDefs.forEach(tab => {
         const tabData = {};
         let hasData = false;
         tab.fields.forEach(f => {
@@ -2838,14 +2893,14 @@
       });
 
       // Legacy: map built-in specs/tour tab fields to .specs/.tour for renderSpecial
-      const specTab = tabDefs.find(t => t.id === 'specs');
+      const specTab = srcTabDefs.find(t => t.id === 'specs');
       if (specTab && project.customTabs.specs) {
         const d = project.customTabs.specs;
         project.specs = { size: d.specSize||'', color: d.specColor||'', affinity: d.specAffinity||'', print: d.specPrint||'', notes: d.specNotes||'' };
         if (!Object.values(project.specs).some(Boolean)) project.specs = null;
       } else { project.specs = null; }
 
-      const tourTab = tabDefs.find(t => t.id === 'tour');
+      const tourTab = srcTabDefs.find(t => t.id === 'tour');
       if (tourTab && project.customTabs.tour) {
         const d = project.customTabs.tour;
         project.tour = { pledgeType: d.tourPledgeType||'', cancellation: d.tourCancellation||'', dates: d.tourDates||'', capacity: d.tourCapacity||'', checklist: d.tourChecklist||'' };
