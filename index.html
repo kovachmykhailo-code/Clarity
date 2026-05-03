@@ -426,8 +426,39 @@
       cursor: pointer;
       transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease,
                   opacity .28s ease, filter .28s ease;
+      position: relative;
     }
     .project-card:hover { transform: translateY(-2px); box-shadow: var(--soft-shadow); }
+    .project-card.dragging {
+      opacity: .35 !important;
+      filter: saturate(0) !important;
+      transform: scale(.97) !important;
+      cursor: grabbing;
+    }
+    .project-card.drag-target {
+      border-color: rgba(184,147,79,.7) !important;
+      box-shadow: 0 0 0 2px rgba(184,147,79,.35), var(--shadow) !important;
+    }
+    .drag-handle {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: rgba(0,0,0,.22);
+      backdrop-filter: blur(4px);
+      display: grid;
+      place-items: center;
+      cursor: grab;
+      opacity: 0;
+      transition: opacity .15s;
+      z-index: 2;
+      color: rgba(255,255,255,.8);
+    }
+    .drag-handle svg { width: 14px; height: 14px; pointer-events: none; }
+    .project-card:hover .drag-handle { opacity: 1; }
+    .project-card.dragging .drag-handle { opacity: 0; }
 
     /* Active card — vivid, full size */
     .project-card.is-active {
@@ -1680,8 +1711,11 @@
     }
 
     function renderProjects() {
-      const selected = state.projects.find(p => p.id === selectedProjectId) || state.projects[0];
-      if (selected && selectedProjectId !== selected.id) selectedProjectId = selected.id;
+      // Keep selectedProjectId if valid; do NOT auto-reset to first project after save
+      if (!state.projects.find(p => p.id === selectedProjectId)) {
+        selectedProjectId = state.projects[0]?.id || null;
+      }
+      const selected = state.projects.find(p => p.id === selectedProjectId) || null;
 
       const emptyState = !state.projects.length ? `
         <div class="note-card" style="text-align:center;padding:32px">
@@ -1709,7 +1743,18 @@
             const progress = Math.round(done / Math.max(tasks.length, 1) * 100);
             const stateClass = isActive ? 'is-active' : 'is-inactive';
             return `
-              <article class="card project-card ${stateClass}" onclick="openProject('${p.id}')">
+              <article class="card project-card ${stateClass}"
+                onclick="openProject('${p.id}')"
+                draggable="true"
+                data-project-id="${p.id}"
+                ondragstart="projectDragStart(event,'${p.id}')"
+                ondragover="projectDragOver(event)"
+                ondragleave="projectDragLeave(event)"
+                ondrop="projectDrop(event,'${p.id}')"
+                ondragend="projectDragEnd(event)">
+                <div class="drag-handle" title="Перетягнути для зміни порядку" onclick="event.stopPropagation()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="5" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+                </div>
                 <div class="cover" style="background:${p.cover}"></div>
                 <div class="project-body">
                   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
@@ -2977,6 +3022,62 @@
     window.deleteTask = deleteTask;
     window.deleteProject = deleteProject;
     window.dropTaskToMatrix = dropTaskToMatrix;
+    // ── Project card drag-and-drop ──────────────────────────────────────────
+    let _dragProjectId = null;
+
+    function projectDragStart(event, id) {
+      _dragProjectId = id;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', id);
+      // Delay class add so ghost image captures original style
+      requestAnimationFrame(() => event.target.closest('.project-card')?.classList.add('dragging'));
+    }
+
+    function projectDragOver(event) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      const card = event.target.closest('.project-card');
+      if (card && card.dataset.projectId !== _dragProjectId) {
+        document.querySelectorAll('.project-card.drag-target').forEach(c => c.classList.remove('drag-target'));
+        card.classList.add('drag-target');
+      }
+    }
+
+    function projectDragLeave(event) {
+      const card = event.target.closest('.project-card');
+      if (card && !card.contains(event.relatedTarget)) card.classList.remove('drag-target');
+    }
+
+    function projectDrop(event, targetId) {
+      event.preventDefault();
+      const sourceId = _dragProjectId;
+      if (!sourceId || sourceId === targetId) return;
+      const fromIdx = state.projects.findIndex(p => p.id === sourceId);
+      const toIdx   = state.projects.findIndex(p => p.id === targetId);
+      if (fromIdx === -1 || toIdx === -1) return;
+      // Reorder in place
+      const [moved] = state.projects.splice(fromIdx, 1);
+      state.projects.splice(toIdx, 0, moved);
+      saveState();
+      renderProjects();
+      requestAnimationFrame(() => {
+        document.querySelectorAll('.progress > span').forEach(el => el.style.width = el.dataset.width);
+        renderIcons();
+      });
+    }
+
+    function projectDragEnd(event) {
+      _dragProjectId = null;
+      document.querySelectorAll('.project-card.dragging, .project-card.drag-target')
+        .forEach(c => c.classList.remove('dragging', 'drag-target'));
+    }
+
+    window.projectDragStart = projectDragStart;
+    window.projectDragOver  = projectDragOver;
+    window.projectDragLeave = projectDragLeave;
+    window.projectDrop      = projectDrop;
+    window.projectDragEnd   = projectDragEnd;
+
     window.openProject = openProject;
     window.openProjectModal = openProjectModal;
     window.addDomain = addDomain;
