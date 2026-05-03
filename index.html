@@ -851,6 +851,7 @@
       text-align: center; cursor: pointer; transition: border-color .2s, background .2s;
     }
     .settings-upload-zone:hover, .settings-upload-zone.drag-over { border-color: var(--gold); background: rgba(184,147,79,.04); }
+    .agenda-item.agenda-drag-over { box-shadow: 0 -3px 0 var(--gold); background: rgba(184,147,79,.07); }
     .logo-preview {
       width: 52px; height: 52px; border-radius: 12px;
       border: 1px solid var(--line); background: var(--panel);
@@ -2240,9 +2241,11 @@
               </div>
               <button class="btn btn-ghost" style="font-size:12px" onclick="addAgendaItem()"><i data-lucide="plus"></i> Пункт</button>
             </div>
-            <div style="margin-top:4px;display:grid;gap:8px">
+            <div id="agendaList" style="margin-top:4px;display:grid;gap:8px">
               ${(state.agendaItems || []).map((item, idx) => `
-                <div class="mini-task" style="display:flex;align-items:center;gap:8px">
+                <div class="mini-task agenda-item" draggable="true" data-idx="${idx}"
+                  style="display:flex;align-items:center;gap:8px;transition:opacity .15s,box-shadow .15s">
+                  <span class="agenda-grip" style="cursor:grab;color:var(--faint);flex-shrink:0;font-size:16px;padding:0 2px;user-select:none" title="Перетягнути">&#8942;&#8942;</span>
                   <span style="flex:1">${escapeHTML(item)}</span>
                   <button class="btn icon-btn" style="width:24px;height:24px;font-size:11px" title="Редагувати" onclick="editAgendaItem(${idx})"><i data-lucide="pencil"></i></button>
                   <button class="btn icon-btn btn-danger" style="width:24px;height:24px;font-size:11px" title="Видалити" onclick="removeAgendaItem(${idx})"><i data-lucide="trash-2"></i></button>
@@ -2257,6 +2260,47 @@
       document.getElementById('sessionForm')?.addEventListener('submit', event => {
         event.preventDefault();
         addSession();
+      });
+      initAgendaDnD();
+    }
+
+    function initAgendaDnD() {
+      const list = document.getElementById('agendaList');
+      if (!list) return;
+      let dragIdx = null;
+
+      list.querySelectorAll('.agenda-item').forEach(el => {
+        el.addEventListener('dragstart', e => {
+          dragIdx = parseInt(el.dataset.idx);
+          e.dataTransfer.effectAllowed = 'move';
+          requestAnimationFrame(() => { el.style.opacity = '0.4'; });
+        });
+        el.addEventListener('dragend', () => {
+          el.style.opacity = '';
+          list.querySelectorAll('.agenda-item').forEach(r => r.classList.remove('agenda-drag-over'));
+          dragIdx = null;
+        });
+        el.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          list.querySelectorAll('.agenda-item').forEach(r => r.classList.remove('agenda-drag-over'));
+          el.classList.add('agenda-drag-over');
+        });
+        el.addEventListener('dragleave', () => {
+          el.classList.remove('agenda-drag-over');
+        });
+        el.addEventListener('drop', e => {
+          e.preventDefault();
+          const toIdx = parseInt(el.dataset.idx);
+          if (dragIdx === null || dragIdx === toIdx) return;
+          const items = state.agendaItems || [];
+          const [moved] = items.splice(dragIdx, 1);
+          items.splice(toIdx, 0, moved);
+          state.agendaItems = items;
+          saveState();
+          renderSessions();
+          requestAnimationFrame(renderIcons);
+        });
       });
     }
 
