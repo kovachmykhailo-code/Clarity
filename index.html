@@ -907,7 +907,7 @@
           </button>
         </div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;opacity:.45;line-height:1.5">
-          © 2025 Clarity · Made by <strong>Kovach</strong>
+          © 2026 Clarity · Made by <strong>Kovach</strong>
         </div>
       </div>
     </aside>
@@ -1456,8 +1456,8 @@
         <div class="clarity-hero">
           <div class="card clarity-panel">
             <div class="eyebrow">The Clarity Board</div>
-            <h2>${stats.pure === 100 ? 'Pure Clarity. Сьогодні все закрито.' : 'Фокус без хаосу. Видно, що горить і що рухає систему.'}</h2>
-            <p>Єдина панель для графічного дизайну, продуктових задач і туристичних продуктів: дедлайни, здоров’я проєктів, пріоритети та референси в одному місці.</p>
+            <h2>${stats.pure === 100 ? 'Pure Clarity. Сьогодні все закрито.' : escapeHTML(state.clarityTitle || 'Фокус без хаосу. Видно, що горить і що рухає систему.')}</h2>
+            <p>${escapeHTML(state.clarityText || 'Єдина панель для графічного дизайну, продуктових задач і туристичних продуктів: дедлайни, здоров’я проєктів, пріоритети та референси в одному місці.')}</p>
           </div>
           <div class="card pure-clarity">
             <div class="pure-ring" style="--pct:${stats.pure}" data-value="${stats.pure}%"></div>
@@ -1752,8 +1752,16 @@
 
     function openProject(id) {
       selectedProjectId = id;
-      if (currentRoute() !== 'projects') location.hash = 'projects';
-      rerenderActive();
+      if (currentRoute() !== 'projects') {
+        location.hash = 'projects';
+        // hashchange listener calls render() — no extra call needed
+      } else {
+        renderProjects();
+        requestAnimationFrame(() => {
+          document.querySelectorAll('.progress > span').forEach(el => el.style.width = el.dataset.width);
+          renderIcons();
+        });
+      }
     }
 
     function renderAnalytics() {
@@ -2168,6 +2176,23 @@
 
           <div>
             <div class="card pad" style="margin-bottom:16px">
+              <div class="eyebrow">Clarity Board</div>
+              <h2 class="card-title" style="margin-bottom:14px">Текст головного банера</h2>
+              <div class="field" style="margin-bottom:10px">
+                <label>Заголовок (коли є незакриті задачі)</label>
+                <input id="settingsClarityTitle" value="${escapeHTML(state.clarityTitle || '')}" placeholder="Фокус без хаосу. Видно, що горить і що рухає систему.">
+              </div>
+              <div class="field" style="margin-bottom:14px">
+                <label>Підпис</label>
+                <textarea id="settingsClarityText" rows="3" placeholder="Єдина панель для графічного дизайну...">${escapeHTML(state.clarityText || '')}</textarea>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary" onclick="saveClarityBannerText()"><i data-lucide="save"></i> Зберегти</button>
+                <button class="btn btn-ghost" onclick="resetClarityBannerText()">Скинути</button>
+              </div>
+            </div>
+
+            <div class="card pad" style="margin-bottom:16px">
               <div class="eyebrow">App identity</div>
               <h2 class="card-title" style="margin-bottom:14px">Назва і підзаголовок</h2>
               <div class="field" style="margin-bottom:10px">
@@ -2307,6 +2332,26 @@
       showToast('Назву статусу оновлено.');
     }
 
+    function saveClarityBannerText() {
+      const title = document.getElementById('settingsClarityTitle')?.value.trim();
+      const text  = document.getElementById('settingsClarityText')?.value.trim();
+      if (title !== undefined) state.clarityTitle = title;
+      if (text  !== undefined) state.clarityText  = text;
+      saveState();
+      showToast('Текст банера збережено.');
+      if (currentRoute() === 'board') renderBoard();
+    }
+
+    function resetClarityBannerText() {
+      if (!confirm('Скинути текст банера до стандартного?')) return;
+      delete state.clarityTitle;
+      delete state.clarityText;
+      saveState();
+      showToast('Текст банера скинуто.');
+      renderSettings();
+      if (currentRoute() === 'board') renderBoard();
+    }
+
     function saveAppIdentity() {
       const name = document.getElementById('settingsAppName')?.value.trim();
       const subtitle = document.getElementById('settingsAppSubtitle')?.value.trim();
@@ -2357,6 +2402,7 @@
       if (state.appName) { document.querySelector('.brand-title').textContent = state.appName; document.title = state.appName + ' — Project Management'; }
       if (state.appSubtitle) document.querySelector('.brand-subtitle').textContent = state.appSubtitle;
       if (state.statusLabels) Object.entries(state.statusLabels).forEach(([key, label]) => { if (STATUS_CONFIG[key]) STATUS_CONFIG[key].label = label; });
+      if (state.theme) document.body.dataset.theme = state.theme;
     }
 
     function renderTaskProjectOptions() {
@@ -2850,7 +2896,10 @@
       if (event.target.id === 'projectModal') closeProjectModal();
     });
     document.getElementById('themeBtn').addEventListener('click', () => {
-      document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+      const isDark = document.body.dataset.theme === 'dark';
+      document.body.dataset.theme = isDark ? 'light' : 'dark';
+      state.theme = document.body.dataset.theme;
+      saveState();
       drawCharts();
       renderIcons();
     });
@@ -3080,6 +3129,8 @@
       return btn?.dataset.value || '';
     }
 
+    window.saveClarityBannerText = saveClarityBannerText;
+    window.resetClarityBannerText = resetClarityBannerText;
     window.uploadLogo = uploadLogo;
     window.removeLogo = removeLogo;
     window.dpMove = dpMove;
