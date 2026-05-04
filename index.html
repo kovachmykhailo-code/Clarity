@@ -1189,12 +1189,14 @@
       if (!currentUser) { saveStateLocal(); return; }
       setSyncDot('syncing');
       try {
+        // Never send logoDataUrl to Firestore — base64 can exceed 1MB limit
+        const { logoDataUrl, ...firestoreState } = state;
         await userDocRef(currentUser.uid).set(
-          { ...state, _updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+          { ...firestoreState, _updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
           { merge: false }
         );
         setSyncDot('ok');
-        saveStateLocal(); // also keep local copy as fallback
+        saveStateLocal(); // also keep local copy (with logo) as fallback
       } catch (err) {
         console.error('Firestore save error:', err);
         setSyncDot('error');
@@ -1212,6 +1214,11 @@
           delete data._updatedAt;
           const prevSelectedId = selectedProjectId;
           state = migrateState(data);
+          // Logo is stored only in localStorage — restore it after Firestore load
+          const localRaw = localStorage.getItem(STORAGE_KEY);
+          if (localRaw) {
+            try { const local = JSON.parse(localRaw); if (local.logoDataUrl) state.logoDataUrl = local.logoDataUrl; } catch(_) {}
+          }
           // Preserve selectedProjectId if still valid, otherwise fall back to first
           if (prevSelectedId && state.projects.find(p => p.id === prevSelectedId)) {
             selectedProjectId = prevSelectedId;
@@ -1354,6 +1361,7 @@
 
     let state = migrateState(loadState());
     let selectedProjectId = state.projects[0]?.id || null;
+    const dpState = {};
     let boardFilters = { query: '', domain: 'all', projectId: 'all', status: 'active', quickFilter: 'active', showAll: false, showAdvanced: false };
     let toastQueue = [];
     let toastShowing = false;
@@ -2205,9 +2213,10 @@
           <div class="card pad">
             <div class="card-header"><div><div class="eyebrow">Planning</div><h2 class="card-title">Clarity Sessions</h2></div></div>
             <form id="sessionForm" class="form-grid" style="margin-bottom:14px">
-              <input id="sessionTitle" placeholder="Назва сесії" required
-                ondragover="event.preventDefault()"
-                ondrop="applySessionTemplate(event)">
+              <div style="position:relative">
+                <input id="sessionTitle" placeholder="Назва сесії або перетягніть шаблон сюди" required style="width:100%;box-sizing:border-box">
+                <div id="sessionTitleDrop" style="position:absolute;inset:0;border-radius:inherit;pointer-events:none;transition:background .15s"></div>
+              </div>
               <div class="datepicker-wrap" id="dpWrap_sessionDate">
                 <button type="button" class="datepicker-input" id="sessionDate" data-value="">
                   <span class="dp-display">Дата сесії</span>
@@ -2272,6 +2281,7 @@
         addSession();
       });
       initTemplateDnD();
+      requestAnimationFrame(renderIcons);
     }
 
     function fillSessionForm(idx) {
@@ -2327,8 +2337,35 @@
 
     function initTemplateDnD() {
       const list = document.getElementById('templateList');
-      if (!list) return;
+      const dropZone = document.getElementById('sessionTitleDrop');
+      const titleInput = document.getElementById('sessionTitle');
       let dragIdx = null;
+
+      // Drop zone on the title field
+      if (dropZone && titleInput) {
+        const parent = titleInput.parentElement;
+        parent.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          dropZone.style.pointerEvents = 'none';
+          dropZone.style.background = 'rgba(184,147,79,.13)';
+          dropZone.style.border = '2px dashed var(--gold)';
+          dropZone.style.borderRadius = '8px';
+        });
+        parent.addEventListener('dragleave', () => {
+          dropZone.style.background = '';
+          dropZone.style.border = '';
+        });
+        parent.addEventListener('drop', e => {
+          e.preventDefault();
+          dropZone.style.background = '';
+          dropZone.style.border = '';
+          const idx = e.dataTransfer.getData('text/plain');
+          if (idx !== '') fillSessionForm(parseInt(idx));
+        });
+      }
+
+      if (!list) return;
 
       list.querySelectorAll('.agenda-item').forEach(el => {
         el.addEventListener('dragstart', e => {
@@ -3415,7 +3452,6 @@
     const MONTHS_UA = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
                        'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
     const DAYS_UA = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
-    const dpState = {};
 
     function initDatepicker(fieldId) {
       const btn = document.getElementById(fieldId);
