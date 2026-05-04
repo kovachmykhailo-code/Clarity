@@ -1366,7 +1366,7 @@
       next.notes ||= [];
       next.sessions ||= [];
       next.archivedProjects ||= [];
-      next.agendaItems ||= ['Перевірити прострочені дедлайни', 'Оновити Health Score', 'Вибрати 3 головні задачі тижня', 'Зафіксувати рішення та наступні кроки'];
+      next.sessionTemplates ||= [];
       next.tasks.forEach(task => {
         if (!['open', 'in_progress', 'blocked', 'on_hold', 'done'].includes(task.status)) task.status = task.done ? 'done' : 'open';
       });
@@ -2205,7 +2205,9 @@
           <div class="card pad">
             <div class="card-header"><div><div class="eyebrow">Planning</div><h2 class="card-title">Clarity Sessions</h2></div></div>
             <form id="sessionForm" class="form-grid" style="margin-bottom:14px">
-              <input id="sessionTitle" placeholder="Назва сесії" required>
+              <input id="sessionTitle" placeholder="Назва сесії" required
+                ondragover="event.preventDefault()"
+                ondrop="applySessionTemplate(event)">
               <div class="datepicker-wrap" id="dpWrap_sessionDate">
                 <button type="button" class="datepicker-input" id="sessionDate" data-value="">
                   <span class="dp-display">Дата сесії</span>
@@ -2231,26 +2233,34 @@
                   </div>
                 </div>
               `;
-            }).join('') : `<div class="note-card"><h3>Сесій ще немає</h3><p class="muted">Додайте першу Clarity Session і зафіксуйте фокус тижня.</p></div>`}
+            }).join('') : `<div class="note-card"><h3>Сесій ще немає</h3><p class="muted">Додайте першу Clarity Session або скористайтесь шаблоном праворуч.</p></div>`}
           </div>
           <div class="card pad">
             <div class="card-header">
               <div>
-                <div class="eyebrow">Agenda</div>
-                <h2 class="card-title">Шаблон сесії</h2>
+                <div class="eyebrow">Шаблони</div>
+                <h2 class="card-title">Швидкий старт</h2>
+                <p class="muted tiny" style="margin-top:4px">Клікніть або перетягніть у поле назви</p>
               </div>
-              <button class="btn btn-ghost" style="font-size:12px" onclick="addAgendaItem()"><i data-lucide="plus"></i> Пункт</button>
+              <button class="btn btn-ghost" style="font-size:12px" onclick="addSessionTemplate()"><i data-lucide="plus"></i> Шаблон</button>
             </div>
-            <div id="agendaList" style="margin-top:4px;display:grid;gap:8px">
-              ${(state.agendaItems || []).map((item, idx) => `
+            <div id="templateList" style="margin-top:4px;display:grid;gap:8px">
+              ${(state.sessionTemplates || []).length ? (state.sessionTemplates || []).map((tpl, idx) => `
                 <div class="mini-task agenda-item" draggable="true" data-idx="${idx}"
-                  style="display:flex;align-items:center;gap:8px;transition:opacity .15s,box-shadow .15s">
-                  <span class="agenda-grip" style="cursor:grab;color:var(--faint);flex-shrink:0;font-size:16px;padding:0 2px;user-select:none" title="Перетягнути">&#8942;&#8942;</span>
-                  <span style="flex:1">${escapeHTML(item)}</span>
-                  <button class="btn icon-btn" style="width:24px;height:24px;font-size:11px" title="Редагувати" onclick="editAgendaItem(${idx})"><i data-lucide="pencil"></i></button>
-                  <button class="btn icon-btn btn-danger" style="width:24px;height:24px;font-size:11px" title="Видалити" onclick="removeAgendaItem(${idx})"><i data-lucide="trash-2"></i></button>
+                  style="display:flex;align-items:center;gap:8px;cursor:pointer;transition:opacity .15s,box-shadow .15s"
+                  title="Клікніть, щоб підставити у форму"
+                  onclick="fillSessionForm(${idx})">
+                  <span class="agenda-grip" style="cursor:grab;color:var(--faint);flex-shrink:0;font-size:16px;padding:0 2px;user-select:none" title="Перетягнути у поле назви">&#8942;&#8942;</span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(tpl.title)}</div>
+                    ${tpl.focus ? `<div class="muted tiny" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(tpl.focus)}</div>` : ''}
+                  </div>
+                  <button class="btn icon-btn" style="width:24px;height:24px;font-size:11px" title="Редагувати шаблон" onclick="event.stopPropagation();editSessionTemplate(${idx})"><i data-lucide="pencil"></i></button>
+                  <button class="btn icon-btn btn-danger" style="width:24px;height:24px;font-size:11px" title="Видалити шаблон" onclick="event.stopPropagation();removeSessionTemplate(${idx})"><i data-lucide="trash-2"></i></button>
                 </div>
-              `).join('')}
+              `).join('') : `<div class="note-card" style="text-align:center;padding:20px 14px">
+                <p class="muted tiny">Шаблонів ще немає.<br>Натисніть «+ Шаблон», щоб додати.</p>
+              </div>`}
             </div>
           </div>
         </div>
@@ -2261,18 +2271,70 @@
         event.preventDefault();
         addSession();
       });
-      initAgendaDnD();
+      initTemplateDnD();
     }
 
-    function initAgendaDnD() {
-      const list = document.getElementById('agendaList');
+    function fillSessionForm(idx) {
+      const tpl = (state.sessionTemplates || [])[idx];
+      if (!tpl) return;
+      const titleEl = document.getElementById('sessionTitle');
+      const focusEl = document.getElementById('sessionFocus');
+      if (titleEl) titleEl.value = tpl.title;
+      if (focusEl) focusEl.value = tpl.focus || '';
+      titleEl?.focus();
+    }
+
+    function applySessionTemplate(event) {
+      event.preventDefault();
+      const idx = event.dataTransfer.getData('text/plain');
+      if (idx === '') return;
+      fillSessionForm(parseInt(idx));
+    }
+
+    function addSessionTemplate() {
+      const title = window.prompt('Назва шаблону:');
+      if (!title || !title.trim()) return;
+      const focus = window.prompt('Фокус (необов\'язково):') || '';
+      state.sessionTemplates ||= [];
+      state.sessionTemplates.push({ title: title.trim(), focus: focus.trim() });
+      saveState();
+      renderSessions();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function editSessionTemplate(idx) {
+      state.sessionTemplates ||= [];
+      const tpl = state.sessionTemplates[idx];
+      if (!tpl) return;
+      const title = window.prompt('Назва шаблону:', tpl.title);
+      if (title === null) return;
+      if (!title.trim()) return removeSessionTemplate(idx);
+      const focus = window.prompt('Фокус:', tpl.focus || '');
+      if (focus === null) return;
+      state.sessionTemplates[idx] = { title: title.trim(), focus: focus.trim() };
+      saveState();
+      renderSessions();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function removeSessionTemplate(idx) {
+      state.sessionTemplates ||= [];
+      state.sessionTemplates.splice(idx, 1);
+      saveState();
+      renderSessions();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function initTemplateDnD() {
+      const list = document.getElementById('templateList');
       if (!list) return;
       let dragIdx = null;
 
       list.querySelectorAll('.agenda-item').forEach(el => {
         el.addEventListener('dragstart', e => {
           dragIdx = parseInt(el.dataset.idx);
-          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', String(dragIdx));
+          e.dataTransfer.effectAllowed = 'copyMove';
           requestAnimationFrame(() => { el.style.opacity = '0.4'; });
         });
         el.addEventListener('dragend', () => {
@@ -2293,10 +2355,10 @@
           e.preventDefault();
           const toIdx = parseInt(el.dataset.idx);
           if (dragIdx === null || dragIdx === toIdx) return;
-          const items = state.agendaItems || [];
+          const items = state.sessionTemplates || [];
           const [moved] = items.splice(dragIdx, 1);
           items.splice(toIdx, 0, moved);
-          state.agendaItems = items;
+          state.sessionTemplates = items;
           saveState();
           renderSessions();
           requestAnimationFrame(renderIcons);
@@ -2314,35 +2376,6 @@
       requestAnimationFrame(renderIcons);
     }
 
-    function addAgendaItem() {
-      const label = window.prompt('Новий пункт agenda:');
-      if (!label || !label.trim()) return;
-      state.agendaItems ||= [];
-      state.agendaItems.push(label.trim());
-      saveState();
-      renderSessions();
-      requestAnimationFrame(renderIcons);
-    }
-
-    function editAgendaItem(idx) {
-      state.agendaItems ||= [];
-      const current = state.agendaItems[idx] || '';
-      const label = window.prompt('Редагувати пункт:', current);
-      if (label === null) return;
-      if (!label.trim()) return removeAgendaItem(idx);
-      state.agendaItems[idx] = label.trim();
-      saveState();
-      renderSessions();
-      requestAnimationFrame(renderIcons);
-    }
-
-    function removeAgendaItem(idx) {
-      state.agendaItems ||= [];
-      state.agendaItems.splice(idx, 1);
-      saveState();
-      renderSessions();
-      requestAnimationFrame(renderIcons);
-    }
 
     function renderArchive() {
       const archived = state.archivedProjects || [];
@@ -3239,9 +3272,11 @@
     window.restoreProject = restoreProject;
     window.permanentlyDeleteProject = permanentlyDeleteProject;
     window.updateSessionStatus = updateSessionStatus;
-    window.addAgendaItem = addAgendaItem;
-    window.editAgendaItem = editAgendaItem;
-    window.removeAgendaItem = removeAgendaItem;
+    window.fillSessionForm = fillSessionForm;
+    window.applySessionTemplate = applySessionTemplate;
+    window.addSessionTemplate = addSessionTemplate;
+    window.editSessionTemplate = editSessionTemplate;
+    window.removeSessionTemplate = removeSessionTemplate;
     window.dropTaskToMatrix = dropTaskToMatrix;
     // ── Project card drag-and-drop ──────────────────────────────────────────
     let _dragProjectId = null;
