@@ -3274,12 +3274,7 @@
     document.getElementById('newTaskBtn').addEventListener('click', () => openTaskModal());
     document.querySelectorAll('[data-close-modal]').forEach(btn => btn.addEventListener('click', closeTaskModal));
     document.querySelectorAll('[data-close-project]').forEach(btn => btn.addEventListener('click', closeProjectModal));
-    document.getElementById('taskModal').addEventListener('click', event => {
-      if (event.target.id === 'taskModal') closeTaskModal();
-    });
-    document.getElementById('projectModal').addEventListener('click', event => {
-      if (event.target.id === 'projectModal') closeProjectModal();
-    });
+
     document.getElementById('themeBtn').addEventListener('click', () => {
       const isDark = document.body.dataset.theme === 'dark';
       document.body.dataset.theme = isDark ? 'light' : 'dark';
