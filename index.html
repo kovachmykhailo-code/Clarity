@@ -413,6 +413,74 @@
     .mini-task:active { cursor: grabbing; }
     .mini-task[draggable="true"]:hover { box-shadow: var(--soft-shadow); transform: translateY(-1px); }
 
+    /* ── Kanban board ── */
+    .kanban-wrap {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+      align-items: flex-start;
+      scrollbar-width: thin;
+    }
+    .kanban-col {
+      flex: 0 0 260px;
+      min-width: 260px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 220px);
+    }
+    [data-theme="dark"] .kanban-col { background: rgba(255,255,255,.04); }
+    .kanban-col.kanban-drag-over { background: rgba(184,147,79,.1); border-color: rgba(184,147,79,.5); }
+    .kanban-col-head {
+      padding: 11px 13px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    .kanban-col-title { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+    .kanban-col-count {
+      min-width: 22px; height: 22px; border-radius: 999px;
+      background: var(--panel-solid); border: 1px solid var(--line);
+      display: grid; place-items: center;
+      font-size: 11px; font-weight: 700; color: var(--muted);
+    }
+    .kanban-cards {
+      padding: 10px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      scrollbar-width: thin;
+    }
+    .kanban-card {
+      background: var(--panel-solid);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px 12px;
+      cursor: grab;
+      transition: box-shadow .15s, transform .15s, border-color .15s;
+      user-select: none;
+    }
+    .kanban-card:hover { box-shadow: var(--soft-shadow); transform: translateY(-1px); }
+    .kanban-card:active { cursor: grabbing; }
+    .kanban-card.dragging { opacity: .35; filter: saturate(0); }
+    .kanban-card-title { font-size: 13px; font-weight: 500; line-height: 1.4; margin-bottom: 7px; }
+    .kanban-card-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+    .kanban-empty {
+      padding: 20px 12px;
+      text-align: center;
+      color: var(--faint);
+      font-size: 12px;
+      border: 1.5px dashed var(--line);
+      border-radius: 8px;
+    }
+
     /* ── Project grid: auto-fit so cards reflow naturally ── */
     .projects-grid {
       display: grid;
@@ -948,7 +1016,7 @@
       <header class="topbar">
         <div>
           <h1 id="pageTitle">The Clarity Board</h1>
-          <p id="pageSubtitle">Справи, проєкти, дедлайни та спокійний контроль над різними доменами.</p>
+          <p id="pageSubtitle">Справи, проєкти, дедлайни та спокійний контроль над різними категоріями.</p>
         </div>
         <div class="actions">
           <button class="btn btn-ghost icon-btn" id="themeBtn" title="Змінити тему"><i data-lucide="moon"></i></button>
@@ -957,6 +1025,7 @@
       </header>
 
       <section class="page active" id="board"></section>
+      <section class="page" id="kanban"></section>
       <section class="page" id="projects"></section>
       <section class="page" id="analytics"></section>
       <section class="page" id="matrix"></section>
@@ -988,8 +1057,16 @@
               <input id="projectTitle" placeholder="Наприклад: Brand System 2025">
             </div>
             <div class="field">
-              <label for="projectDomain">Домен</label>
+              <label for="projectDomain">Категорія</label>
               <select id="projectDomain"></select>
+            </div>
+            <div class="field">
+              <label for="projectStatus">Статус проєкту</label>
+              <select id="projectStatus">
+                <option value="active">Активний</option>
+                <option value="on_hold">На паузі</option>
+                <option value="done">Завершено</option>
+              </select>
             </div>
             <div class="field">
               <label for="projectStage">Поточний етап</label>
@@ -1048,7 +1125,7 @@
               <select id="taskProject"></select>
             </div>
             <div class="field">
-              <label for="taskDomain">Домен</label>
+              <label for="taskDomain">Категорія</label>
               <select id="taskDomain">
                 <option>Дизайн</option>
                 <option>Партнери</option>
@@ -1112,6 +1189,31 @@
   <div class="toast" id="toast"></div>
 
   <script>
+    // ── Lightweight Markdown renderer ────────────────────────────────────
+    function renderMarkdown(text) {
+      if (!text) return '';
+      let s = text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      s = s.replace(/^### (.+)$/gm, '<h4 style="margin:10px 0 4px;font-size:13px;font-weight:700">$1</h4>');
+      s = s.replace(/^## (.+)$/gm, '<h3 style="margin:10px 0 4px;font-size:14px;font-weight:700">$1</h3>');
+      s = s.replace(/^# (.+)$/gm, '<h2 style="margin:10px 0 4px;font-size:15px;font-weight:700">$1</h2>');
+      s = s.replace(/^[-*]{3,}$/gm, '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">');
+      s = s.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+      s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      s = s.replace(/`([^`]+)`/g, '<code style="background:var(--panel-2);border-radius:4px;padding:1px 5px;font-size:11px;font-family:var(--mono)">$1</code>');
+      s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener" style="color:var(--gold)">$1</a>');
+      s = s.replace(/(^|[\s>])(https?:\/\/[^\s<&]+)/g, '$1<a href="$2" target="_blank" rel="noreferrer noopener" style="color:var(--gold);word-break:break-all">$2</a>');
+      s = s.replace(/^- \[x\] (.+)$/gm, '<div style="display:flex;align-items:flex-start;gap:6px;margin:2px 0"><span style="color:var(--success);flex-shrink:0">✓</span><span style="text-decoration:line-through;color:var(--muted)">$1</span></div>');
+      s = s.replace(/^- \[ \] (.+)$/gm, '<div style="display:flex;align-items:flex-start;gap:6px;margin:2px 0"><span style="color:var(--faint);flex-shrink:0">○</span><span>$1</span></div>');
+      s = s.replace(/^[-*] (.+)$/gm, '<li style="margin:2px 0 2px 16px;list-style:disc">$1</li>');
+      s = s.replace(/^(\d+)\. (.+)$/gm, '<li style="margin:2px 0 2px 20px;list-style:decimal">$2</li>');
+      s = s.replace(/^&gt; (.+)$/gm, '<div style="border-left:3px solid var(--gold);padding:4px 10px;color:var(--muted);margin:6px 0;font-style:italic">$1</div>');
+      s = s.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+      return s;
+    }
+    // ── END Markdown ──────────────────────────────────────────────────────
+
     // ══════════════════════════════════════════════════════════════════════
     // FIREBASE CONFIG  ← вставте сюди свій конфіг з Firebase Console
     // ══════════════════════════════════════════════════════════════════════
@@ -1284,15 +1386,16 @@
     }
 
     const routes = [
-      ['board', 'layout-dashboard', 'The Clarity Board', 'Справи, проєкти, дедлайни та спокійний контроль над різними доменами.'],
-      ['projects', 'folder-kanban', 'Проєкти', 'Health Score, обкладинки, домени й прогрес кожного напрямку.'],
+      ['board',     'layout-dashboard',       'The Clarity Board',   'Справи, проєкти, дедлайни та спокійний контроль над різними категоріями.'],
+      ['kanban',    'columns',                'Kanban',              'Задачі по колонках статусів із drag-and-drop.'],
+      ['projects',  'folder-kanban',          'Проєкти',             'Health Score, обкладинки, категорії й прогрес кожного напрямку.'],
       ['analytics', 'chart-no-axes-combined', 'Аналітика', 'Розподіл часу, тижнева продуктивність і загальна статистика.'],
       ['matrix', 'panel-top', 'Матриця пріоритетів', 'Розділення задач за терміновістю та важливістю.'],
       ['special', 'sliders-horizontal', 'Special Specs', 'Тур-метадані, технічні параметри дизайну та чек-листи.'],
       ['notes', 'images', 'Нотатки й референси', 'Мудборди, прив’язка до етапів та візуальні посилання.'],
       ['sessions', 'calendar-check', 'Clarity Sessions', 'Щотижневе планування, перегляд пріоритетів і рішень.'],
       ['archive', 'archive', 'Архів проєктів', 'Видалені проєкти — з можливістю відновлення або повного видалення.'],
-      ['settings', 'settings', 'Налаштування', 'Домени, палітра та базові параметри системи.']
+      ['settings', 'settings', 'Налаштування', 'Категорії, палітра та базові параметри системи.']
     ];
 
     const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -1363,6 +1466,7 @@
     let selectedProjectId = state.projects[0]?.id || null;
     const dpState = {};
     let boardFilters = { query: '', domain: 'all', projectId: 'all', status: 'active', quickFilter: 'active', showAll: false, showAdvanced: false };
+    let bulkSelected = new Set(); // task IDs selected for bulk action
     let toastQueue = [];
     let toastShowing = false;
 
@@ -1536,6 +1640,7 @@
     function renderCurrentRoute(route = currentRoute()) {
       const renderers = {
         board: renderBoard,
+        kanban: renderKanban,
         projects: renderProjects,
         analytics: renderAnalytics,
         matrix: renderMatrix,
@@ -1613,7 +1718,7 @@
               <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;margin-bottom:0">
                 <input placeholder="Пошук задачі" value="${escapeHTML(boardFilters.query)}" oninput="setBoardFilter('query', this.value)">
                 <select onchange="setBoardFilter('domain', this.value)">
-                  <option value="all">Усі домени</option>
+                  <option value="all">Усі категорії</option>
                   ${state.domains.map(d => `<option value="${escapeHTML(d.name)}" ${boardFilters.domain === d.name ? 'selected' : ''}>${escapeHTML(d.name)}</option>`).join('')}
                 </select>
                 <select onchange="setBoardFilter('projectId', this.value)">
@@ -1629,6 +1734,17 @@
               ${(boardFilters.query || boardFilters.domain!=='all' || boardFilters.projectId!=='all') ? `<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;color:var(--muted)" onclick="clearAdvFilters()"><i data-lucide="x"></i> Скинути</button>` : ''}
               <span class="muted tiny" style="margin-left:auto">${visibleTasks.length} задач</span>
             </div>
+            ${bulkSelected.size > 0 ? `
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;margin-bottom:10px;border-radius:8px;background:rgba(184,147,79,.1);border:1px solid rgba(184,147,79,.35)">
+              <span class="muted tiny" style="font-weight:600;color:var(--gold)">Обрано: ${bulkSelected.size}</span>
+              <select id="bulkStatusSelect" style="border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:var(--panel-solid);color:var(--text);font-size:12px;cursor:pointer">
+                <option value="">— Змінити статус —</option>
+                ${Object.entries(STATUS_CONFIG).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
+              </select>
+              <button class="btn btn-primary" style="font-size:12px;min-height:30px;padding:0 10px" onclick="bulkChangeStatus()"><i data-lucide="check"></i> Застосувати</button>
+              <button class="btn btn-ghost" style="font-size:12px;min-height:30px;padding:0 10px;color:var(--danger)" onclick="bulkDelete()"><i data-lucide="trash-2"></i> Видалити</button>
+              <button class="btn btn-ghost" style="font-size:12px;min-height:30px;padding:0 10px;margin-left:auto" onclick="bulkSelected.clear();renderBoard();renderIcons()"><i data-lucide="x"></i> Скасувати</button>
+            </div>` : ''}
             ${taskListHTML((boardFilters.showAll ? visibleTasks : visibleTasks.slice(0, 8)))}
             ${hiddenCount && !boardFilters.showAll ? `<button class="btn" style="width:100%;margin-top:8px" onclick="boardFilters.showAll=true; renderBoard(); renderIcons()">Показано 8 із ${visibleTasks.length}. Показати всі</button>` : ''}
           </div>
@@ -1725,11 +1841,15 @@
       const cfg = STATUS_CONFIG[task.status] || STATUS_CONFIG.open;
       const statusClass = overdue ? 'danger' : cfg.cls;
       const isDone = task.status === 'done';
+      const isSelected = bulkSelected.has(task.id);
       return `
-        <div class="task-row">
-          <button class="check ${isDone ? 'done' : ''}" onclick="toggleTask('${task.id}')" title="${isDone ? 'Повернути в роботу' : 'Позначити виконаною'}">
-            ${isDone ? '<i data-lucide="check"></i>' : ''}
-          </button>
+        <div class="task-row${isSelected ? ' task-selected' : ''}" style="${isSelected ? 'border-color:rgba(184,147,79,.55);background:rgba(184,147,79,.07)' : ''}">
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" style="width:14px;height:14px;accent-color:var(--gold);cursor:pointer;flex-shrink:0" ${isSelected?'checked':''} onchange="toggleBulkSelect('${task.id}',this.checked)" title="Обрати для масових дій">
+            <button class="check ${isDone ? 'done' : ''}" onclick="toggleTask('${task.id}')" title="${isDone ? 'Повернути в роботу' : 'Позначити виконаною'}">
+              ${isDone ? '<i data-lucide="check"></i>' : ''}
+            </button>
+          </div>
           <div>
             <div class="task-title">${escapeHTML(task.title)}</div>
             <div class="task-meta">
@@ -1766,6 +1886,196 @@
       `;
     }
 
+    // ── Kanban ────────────────────────────────────────────────────────────
+    let _kanbanDragId = null;
+    let kanbanFilters = { projectId: 'all', category: 'all' };
+
+    function renderKanban() {
+      const el = document.getElementById('kanban');
+      if (!el) return;
+
+      const COLS = [
+        { key: 'open',        label: 'Заплановано',  cls: 'gold'    },
+        { key: 'in_progress', label: 'В роботі',     cls: 'mint'    },
+        { key: 'blocked',     label: 'Заблоковано',  cls: 'danger'  },
+        { key: 'on_hold',     label: 'На паузі',     cls: 'warning' },
+        { key: 'done',        label: 'Виконано',     cls: 'mint'    },
+      ];
+
+      const allTasks = state.tasks.filter(t => {
+        if (kanbanFilters.projectId !== 'all' && t.projectId !== kanbanFilters.projectId) return false;
+        if (kanbanFilters.category !== 'all' && t.domain !== kanbanFilters.category) return false;
+        return true;
+      });
+
+      const colsHTML = COLS.map(col => {
+        const tasks = allTasks.filter(t => (t.status || 'open') === col.key);
+        const today = todayISO();
+        const cardsHTML = tasks.length ? tasks.map(t => {
+          const proj = projectById(t.projectId);
+          const overdue = col.key !== 'done' && t.deadline && t.deadline < today;
+          return `
+            <div class="kanban-card${_kanbanDragId === t.id ? ' dragging' : ''}"
+              draggable="true"
+              data-task-id="${t.id}"
+              ondragstart="kanbanDragStart(event,'${t.id}')"
+              ondragend="kanbanDragEnd(event)">
+              <div class="kanban-card-title">${escapeHTML(t.title)}</div>
+              <div class="kanban-card-meta">
+                <span class="pill" style="font-size:10px;padding:0 6px">${escapeHTML(proj.title)}</span>
+                ${t.deadline ? `<span class="pill ${overdue ? 'danger' : ''}" style="font-size:10px;padding:0 6px">${formatDate(t.deadline)}</span>` : ''}
+                ${t.estimate ? `<span class="muted tiny">${t.estimate}г</span>` : ''}
+              </div>
+              <div style="display:flex;gap:4px;margin-top:8px;justify-content:flex-end">
+                <button class="btn icon-btn" style="width:24px;height:24px" onclick="openTaskModal('${t.id}')" title="Редагувати"><i data-lucide="pencil"></i></button>
+                <button class="btn icon-btn btn-danger" style="width:24px;height:24px" onclick="deleteTask('${t.id}')" title="Видалити"><i data-lucide="trash-2"></i></button>
+              </div>
+            </div>`;
+        }).join('') : `<div class="kanban-empty">Перетягніть сюди задачу</div>`;
+
+        return `
+          <div class="kanban-col"
+            ondragover="event.preventDefault()"
+            ondragenter="this.classList.add('kanban-drag-over')"
+            ondragleave="kanbanColLeave(event,this)"
+            ondrop="kanbanDrop(event,'${col.key}')">
+            <div class="kanban-col-head">
+              <span class="kanban-col-title">
+                <span class="pill ${col.cls}" style="font-size:10px;padding:2px 8px;margin-right:6px">&nbsp;</span>${col.label}
+              </span>
+              <span class="kanban-col-count">${tasks.length}</span>
+            </div>
+            <div class="kanban-cards">${cardsHTML}</div>
+          </div>`;
+      }).join('');
+
+      el.innerHTML = `
+        <div class="card pad" style="margin-bottom:16px">
+          <div class="card-header">
+            <div>
+              <div class="eyebrow">Kanban</div>
+              <h2 class="card-title">Задачі по статусах</h2>
+            </div>
+            <button class="btn btn-primary" onclick="openTaskModal()"><i data-lucide="plus"></i> Нова задача</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:12px;border-top:1px solid var(--line)">
+            <select onchange="kanbanFilters.projectId=this.value;renderKanban();renderIcons()"
+              style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text);cursor:pointer;outline:0">
+              <option value="all" ${kanbanFilters.projectId==='all'?'selected':''}>Усі проєкти</option>
+              ${state.projects.map(p => `<option value="${p.id}" ${kanbanFilters.projectId===p.id?'selected':''}>${escapeHTML(p.title)}</option>`).join('')}
+            </select>
+            <select onchange="kanbanFilters.category=this.value;renderKanban();renderIcons()"
+              style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text);cursor:pointer;outline:0">
+              <option value="all" ${kanbanFilters.category==='all'?'selected':''}>Усі категорії</option>
+              ${state.domains.map(d => `<option value="${escapeHTML(d.name)}" ${kanbanFilters.category===d.name?'selected':''}>${escapeHTML(d.name)}</option>`).join('')}
+            </select>
+            <span class="muted tiny" style="margin-left:auto;align-self:center">${allTasks.length} задач</span>
+          </div>
+        </div>
+        <div class="kanban-wrap">${colsHTML}</div>
+      `;
+    }
+
+    function kanbanDragStart(event, id) {
+      _kanbanDragId = id;
+      event.dataTransfer.setData('text/plain', id);
+      event.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => {
+        const el = document.querySelector(`.kanban-card[data-task-id="${id}"]`);
+        if (el) el.classList.add('dragging');
+      }, 0);
+    }
+
+    function kanbanDragEnd(event) {
+      _kanbanDragId = null;
+      document.querySelectorAll('.kanban-card.dragging').forEach(c => c.classList.remove('dragging'));
+      document.querySelectorAll('.kanban-col.kanban-drag-over').forEach(c => c.classList.remove('kanban-drag-over'));
+    }
+
+    function kanbanColLeave(event, col) {
+      if (!col.contains(event.relatedTarget)) col.classList.remove('kanban-drag-over');
+    }
+
+    function kanbanDrop(event, newStatus) {
+      event.preventDefault();
+      document.querySelectorAll('.kanban-col.kanban-drag-over').forEach(c => c.classList.remove('kanban-drag-over'));
+      const id = event.dataTransfer.getData('text/plain');
+      const task = state.tasks.find(t => t.id === id);
+      if (!task) return;
+      task.status = newStatus;
+      if (newStatus === 'done') task.completedAt = todayISO();
+      else if (task.completedAt) task.completedAt = null;
+      saveState();
+      renderKanban();
+      requestAnimationFrame(renderIcons);
+    }
+
+    // expose globally
+    window.kanbanDragStart = kanbanDragStart;
+    window.kanbanDragEnd   = kanbanDragEnd;
+    window.kanbanColLeave  = kanbanColLeave;
+    window.kanbanDrop      = kanbanDrop;
+    // ── END Kanban ────────────────────────────────────────────────────────
+
+    // ── Project filter state ─────────────────────────────────────────────────
+    let projectFilters = { category: 'all', deadline: 'all', query: '', projectStatus: 'all', sort: 'manual' };
+
+    function setProjectFilter(key, value) {
+      projectFilters[key] = value;
+      renderProjects();
+      renderIcons();
+    }
+
+    function clearProjectFilters() {
+      projectFilters = { category: 'all', deadline: 'all', query: '', projectStatus: 'all', sort: 'manual' };
+      renderProjects();
+      renderIcons();
+    }
+
+    function filterProjects(projects) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const in7 = new Date(today); in7.setDate(today.getDate() + 7);
+      const in30 = new Date(today); in30.setDate(today.getDate() + 30);
+      return projects.filter(p => {
+        if (projectFilters.category !== 'all' && p.domain !== projectFilters.category) return false;
+        if (projectFilters.projectStatus !== 'all' && (p.projectStatus || 'active') !== projectFilters.projectStatus) return false;
+        if (projectFilters.query) {
+          const q = projectFilters.query.toLowerCase();
+          if (!p.title.toLowerCase().includes(q) && !(p.description||'').toLowerCase().includes(q)) return false;
+        }
+        if (projectFilters.deadline !== 'all') {
+          if (!p.due) return projectFilters.deadline === 'no_due';
+          const due = new Date(p.due + 'T00:00:00');
+          if (projectFilters.deadline === 'overdue') return due < today;
+          if (projectFilters.deadline === 'week') return due >= today && due <= in7;
+          if (projectFilters.deadline === 'month') return due >= today && due <= in30;
+          if (projectFilters.deadline === 'no_due') return false;
+        }
+        return true;
+      }).sort((a, b) => {
+        const sort = projectFilters.sort;
+        if (sort === 'manual') return 0; // keep original order
+        if (sort === 'alpha') return a.title.localeCompare(b.title, 'uk');
+        if (sort === 'deadline') {
+          if (!a.due && !b.due) return 0;
+          if (!a.due) return 1;
+          if (!b.due) return -1;
+          return a.due.localeCompare(b.due);
+        }
+        if (sort === 'health') {
+          const ha = computeProjectHealth(a) ?? -1;
+          const hb = computeProjectHealth(b) ?? -1;
+          return hb - ha;
+        }
+        if (sort === 'tasks') {
+          const ta = state.tasks.filter(t => t.projectId === a.id).length;
+          const tb = state.tasks.filter(t => t.projectId === b.id).length;
+          return tb - ta;
+        }
+        return 0;
+      });
+    }
+
     function renderProjects() {
       // Keep selectedProjectId if valid; do NOT auto-reset to first project after save
       if (!state.projects.find(p => p.id === selectedProjectId)) {
@@ -1773,10 +2083,21 @@
       }
       const selected = state.projects.find(p => p.id === selectedProjectId) || null;
 
-      const emptyState = !state.projects.length ? `
+      const filtered = filterProjects(state.projects);
+      const hasActiveFilters = projectFilters.category !== 'all' || projectFilters.deadline !== 'all' || projectFilters.query || projectFilters.projectStatus !== 'all' || projectFilters.sort !== 'manual';
+
+      const deadlineOptions = [
+        { key: 'all', label: 'Будь-який дедлайн' },
+        { key: 'overdue', label: 'Прострочені' },
+        { key: 'week', label: 'До кінця тижня' },
+        { key: 'month', label: 'До кінця місяця' },
+        { key: 'no_due', label: 'Без дедлайну' },
+      ];
+
+      const emptyState = !filtered.length ? `
         <div class="note-card" style="text-align:center;padding:32px">
-          <h3>Проєктів ще немає</h3>
-          <p class="muted">Натисніть «Новий проєкт», щоб розпочати.</p>
+          <h3>${!state.projects.length ? 'Проєктів ще немає' : 'Нічого не знайдено'}</h3>
+          <p class="muted">${!state.projects.length ? 'Натисніть «Новий проєкт», щоб розпочати.' : 'Спробуйте змінити фільтри.'}</p>
         </div>` : '';
 
       document.getElementById('projects').innerHTML = `
@@ -1788,16 +2109,63 @@
             </div>
             <button class="btn btn-primary" onclick="openProjectModal()"><i data-lucide="plus"></i> Новий проєкт</button>
           </div>
+          <!-- Filter bar -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;padding-top:12px;border-top:1px solid var(--line)">
+            <input
+              placeholder="Пошук проєкту…"
+              value="${escapeHTML(projectFilters.query)}"
+              oninput="setProjectFilter('query', this.value)"
+              style="min-width:160px;flex:1 1 160px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text);outline:0">
+            <select onchange="setProjectFilter('sort', this.value)"
+              style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text);cursor:pointer;outline:0">
+              <option value="manual" ${projectFilters.sort==='manual'?'selected':''}>Ручний порядок</option>
+              <option value="alpha" ${projectFilters.sort==='alpha'?'selected':''}>А → Я</option>
+              <option value="deadline" ${projectFilters.sort==='deadline'?'selected':''}>Дедлайн ↑</option>
+              <option value="health" ${projectFilters.sort==='health'?'selected':''}>Health Score ↓</option>
+              <option value="tasks" ${projectFilters.sort==='tasks'?'selected':''}>Кількість задач ↓</option>
+            </select>
+            <select onchange="setProjectFilter('projectStatus', this.value)"
+              style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text);cursor:pointer;outline:0">
+              <option value="all" ${projectFilters.projectStatus==='all'?'selected':''}>Усі статуси</option>
+              <option value="active" ${projectFilters.projectStatus==='active'?'selected':''}>Активний</option>
+              <option value="on_hold" ${projectFilters.projectStatus==='on_hold'?'selected':''}>На паузі</option>
+              <option value="done" ${projectFilters.projectStatus==='done'?'selected':''}>Завершено</option>
+            </select>
+            <select onchange="setProjectFilter('category', this.value)"
+              style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text);cursor:pointer;outline:0">
+              <option value="all" ${projectFilters.category==='all'?'selected':''}>Усі категорії</option>
+              ${state.domains.map(d => `<option value="${escapeHTML(d.name)}" ${projectFilters.category===d.name?'selected':''}>${escapeHTML(d.name)}</option>`).join('')}
+            </select>
+            <select onchange="setProjectFilter('deadline', this.value)"
+              style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text);cursor:pointer;outline:0">
+              ${deadlineOptions.map(o => `<option value="${o.key}" ${projectFilters.deadline===o.key?'selected':''}>${o.label}</option>`).join('')}
+            </select>
+            ${hasActiveFilters ? `<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;color:var(--muted)" onclick="clearProjectFilters()"><i data-lucide="x"></i> Скинути</button>` : ''}
+            <span class="muted tiny" style="margin-left:auto;white-space:nowrap">${filtered.length} з ${state.projects.length}</span>
+          </div>
         </div>
         ${emptyState}
         <div class="projects-grid">
-          ${state.projects.map(p => {
+          ${filtered.map(p => {
             const isActive = p.id === selected?.id;
             const health = computeProjectHealth(p);
             const tasks = state.tasks.filter(t => t.projectId === p.id);
             const done = tasks.filter(t => t.status === 'done').length;
             const progress = Math.round(done / Math.max(tasks.length, 1) * 100);
             const stateClass = isActive ? 'is-active' : 'is-inactive';
+            // Deadline badge
+            const today2 = new Date(); today2.setHours(0,0,0,0);
+            let dueBadge = '';
+            if (p.due) {
+              const due = new Date(p.due + 'T00:00:00');
+              const diff = Math.round((due - today2) / 86400000);
+              if (diff < 0) dueBadge = `<span class="pill danger" style="font-size:10px;padding:0 6px">Прострочено</span>`;
+              else if (diff <= 7) dueBadge = `<span class="pill warning" style="font-size:10px;padding:0 6px">До ${formatDate(p.due)}</span>`;
+            }
+            // Status badge
+            const psMap = { active: null, on_hold: ['warning','На паузі'], done: ['mint','Завершено'] };
+            const psBadge = psMap[p.projectStatus || 'active'];
+            const statusBadgeHtml = psBadge ? `<span class="pill ${psBadge[0]}" style="font-size:10px;padding:0 6px">${psBadge[1]}</span>` : '';
             return `
               <article class="card project-card ${stateClass}"
                 onclick="openProject('${p.id}')"
@@ -1814,12 +2182,14 @@
                 <div class="cover" style="background:${p.cover}"></div>
                 <div class="project-body">
                   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-                    <div>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">
                       <span class="pill gold">${escapeHTML(p.domain)}</span>
-                      <h3>${escapeHTML(p.title)}</h3>
+                      ${dueBadge}
+                      ${statusBadgeHtml}
                     </div>
                     <div class="health" style="--score:${health !== null ? health + '%' : '0%'}" data-score="${health !== null ? health + '%' : '—'}" title="${health === null ? 'Немає задач — Health Score не розраховано' : 'Health Score: ' + health + '%'}"></div>
                   </div>
+                  <h3 style="margin:6px 0 2px">${escapeHTML(p.title)}</h3>
                   <p class="muted tiny" style="line-height:1.55">${escapeHTML(p.description || '')}</p>
                   <div class="progress"><span data-width="${progress}%"></span></div>
                   <div class="task-meta" style="margin-top:10px">
@@ -1832,7 +2202,7 @@
             `;
           }).join('')}
         </div>
-        ${selected ? projectDetailHTML(selected) : ''}
+        ${selected && filtered.find(p => p.id === selected.id) ? projectDetailHTML(selected) : ''}
       `;
     }
 
@@ -1856,7 +2226,7 @@
             </div>
           </div>
           <div class="grid grid-3">
-            <div class="note-card"><span class="muted tiny">Домен</span><h3>${escapeHTML(project.domain)}</h3></div>
+            <div class="note-card"><span class="muted tiny">Категорія</span><h3>${escapeHTML(project.domain)}</h3></div>
             <div class="note-card"><span class="muted tiny">Етап</span><h3>${escapeHTML(project.stage || 'Не задано')}</h3></div>
             <div class="note-card"><span class="muted tiny">Дедлайн</span><h3>${project.due ? formatDate(project.due) : 'Не задано'}</h3></div>
           </div>
@@ -1905,7 +2275,7 @@
       document.getElementById('analytics').innerHTML = `
         <div class="grid grid-2">
           <div class="card pad">
-            <div class="card-header"><div><div class="eyebrow">Domains</div><h2 class="card-title">Розподіл часу між доменами</h2></div></div>
+            <div class="card-header"><div><div class="eyebrow">Categories</div><h2 class="card-title">Розподіл часу між категоріями</h2></div></div>
             <div style="display:flex;align-items:center;gap:24px;padding-top:12px;flex-wrap:wrap">
               <div style="flex:0 0 190px">
                 <canvas id="domainChart" style="width:190px;height:190px;display:block"></canvas>
@@ -2069,7 +2439,10 @@
         'triangle-alert': '<path d="M12 3 22 20H2z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
         check: '<path d="m5 12 4 4L19 6"/>',
         'heart-pulse': '<path d="M20.5 5.5a5 5 0 0 0-7.1 0L12 7l-1.4-1.5a5 5 0 1 0-7.1 7.1L12 21l8.5-8.4a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
-        'trash-2': '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'
+        'trash-2': '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+        columns: '<rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="18" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/>',
+        pencil: '<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+        ban: '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>'
       };
       document.querySelectorAll('i[data-lucide]').forEach(node => {
         const name = node.dataset.lucide;
@@ -2175,6 +2548,38 @@
       `;
     }
 
+    // ── Note edit state ───────────────────────────────────────────────────
+    let editingNoteId = null;
+
+    function startEditNote(id) {
+      editingNoteId = id;
+      renderNotes();
+      requestAnimationFrame(() => {
+        document.getElementById('noteEditText_' + id)?.focus();
+        renderIcons();
+      });
+    }
+
+    function cancelEditNote() {
+      editingNoteId = null;
+      renderNotes();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function saveEditNote(id) {
+      const note = state.notes.find(n => n.id === id);
+      if (!note) return;
+      note.title = document.getElementById('noteEditTitle_' + id)?.value.trim() || note.title;
+      note.text  = document.getElementById('noteEditText_' + id)?.value || '';
+      note.url   = document.getElementById('noteEditUrl_' + id)?.value.trim() || '';
+      note.stage = document.getElementById('noteEditStage_' + id)?.value.trim() || '';
+      editingNoteId = null;
+      saveState();
+      showToast('Нотатку збережено.');
+      renderNotes();
+      requestAnimationFrame(renderIcons);
+    }
+
     function renderNotes() {
       document.getElementById('notes').innerHTML = `
         <div class="card pad" style="margin-bottom:16px">
@@ -2184,20 +2589,59 @@
             <select id="noteProject">${state.projects.map(p => `<option value="${p.id}">${escapeHTML(p.title)}</option>`).join('')}</select>
             <input id="noteStage" placeholder="Етап">
             <input id="noteUrl" placeholder="Посилання або локальний шлях">
-            <textarea id="noteText" placeholder="Короткий контекст"></textarea>
+            <textarea id="noteText" rows="3" placeholder="Markdown: **жирний**, *курсив*, - список, [текст](url), \`код\`, > цитата, - [x] виконано" style="font-family:var(--mono);font-size:12px"></textarea>
             <button class="btn btn-primary" type="submit"><i data-lucide="plus"></i> Додати нотатку</button>
           </form>
+          <p class="muted tiny" style="margin:8px 0 0">Підтримується Markdown у тексті нотаток</p>
         </div>
         <div class="grid grid-3">
-          ${state.notes.length ? state.notes.map(note => `
-            <article class="note-card">
-              <span class="pill gold">${projectById(note.projectId).title}</span>
-              <h3>${escapeHTML(note.title)}</h3>
-              <p class="muted tiny">${escapeHTML(note.stage)}${note.text ? ' · ' + escapeHTML(note.text) : ''}</p>
-              ${note.url ? `<a href="${escapeHTML(note.url)}" target="_blank" rel="noreferrer noopener">${escapeHTML(note.url)}</a>` : ''}
-              <div style="margin-top:10px"><button class="btn btn-danger" onclick="deleteNote('${note.id}')"><i data-lucide="trash-2"></i> Видалити</button></div>
-            </article>
-          `).join('') : `<div class="note-card"><h3>Нотаток ще немає</h3><p class="muted">Додайте перший moodboard або референс через форму вище.</p></div>`}
+          ${state.notes.length ? state.notes.map(note => {
+            const isEditing = editingNoteId === note.id;
+            if (isEditing) {
+              return `
+                <article class="note-card" style="grid-column:1/-1;max-width:680px">
+                  <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+                    <span class="pill gold">${projectById(note.projectId).title}</span>
+                    <span class="muted tiny">Редагування</span>
+                  </div>
+                  <div class="field" style="margin-bottom:8px">
+                    <label style="font-size:11px;color:var(--muted)">Назва</label>
+                    <input id="noteEditTitle_${note.id}" value="${escapeHTML(note.title)}" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text)">
+                  </div>
+                  <div class="field" style="margin-bottom:8px">
+                    <label style="font-size:11px;color:var(--muted)">Markdown-текст</label>
+                    <textarea id="noteEditText_${note.id}" rows="8" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel-solid);color:var(--text);font-family:var(--mono);font-size:12px;resize:vertical">${escapeHTML(note.text || '')}</textarea>
+                  </div>
+                  <div class="field" style="margin-bottom:8px">
+                    <label style="font-size:11px;color:var(--muted)">Посилання</label>
+                    <input id="noteEditUrl_${note.id}" value="${escapeHTML(note.url || '')}" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text)">
+                  </div>
+                  <div class="field" style="margin-bottom:12px">
+                    <label style="font-size:11px;color:var(--muted)">Етап</label>
+                    <input id="noteEditStage_${note.id}" value="${escapeHTML(note.stage || '')}" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel-solid);color:var(--text)">
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" onclick="saveEditNote('${note.id}')"><i data-lucide="save"></i> Зберегти</button>
+                    <button class="btn btn-ghost" onclick="cancelEditNote()">Скасувати</button>
+                  </div>
+                </article>`;
+            }
+            const mdHtml = renderMarkdown(note.text || '');
+            return `
+              <article class="note-card">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
+                  <span class="pill gold">${projectById(note.projectId).title}</span>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn icon-btn" style="width:26px;height:26px" onclick="startEditNote('${note.id}')" title="Редагувати"><i data-lucide="pencil"></i></button>
+                    <button class="btn icon-btn btn-danger" style="width:26px;height:26px" onclick="deleteNote('${note.id}')" title="Видалити"><i data-lucide="trash-2"></i></button>
+                  </div>
+                </div>
+                <h3 style="margin:0 0 6px">${escapeHTML(note.title)}</h3>
+                ${note.stage ? `<div class="muted tiny" style="margin-bottom:6px">${escapeHTML(note.stage)}</div>` : ''}
+                ${mdHtml ? `<div style="font-size:13px;line-height:1.6">${mdHtml}</div>` : ''}
+                ${note.url && !mdHtml.includes('href') ? `<a href="${escapeHTML(note.url)}" target="_blank" rel="noreferrer noopener" style="display:block;margin-top:8px;font-size:12px;color:var(--gold);word-break:break-all">${escapeHTML(note.url)}</a>` : ''}
+              </article>`;
+          }).join('') : `<div class="note-card"><h3>Нотаток ще немає</h3><p class="muted">Додайте перший moodboard або референс через форму вище.</p></div>`}
         </div>
       `;
       document.getElementById('noteForm')?.addEventListener('submit', event => {
@@ -2465,28 +2909,28 @@
             <div class="card pad" style="margin-bottom:16px">
               <div class="card-header">
                 <div>
-                  <div class="eyebrow">Domains</div>
-                  <h2 class="card-title">Домени роботи</h2>
-                  <p class="muted tiny">Домени використовуються в задачах, проєктах і аналітиці.</p>
+                  <div class="eyebrow">Categories</div>
+                  <h2 class="card-title">Категорії роботи</h2>
+                  <p class="muted tiny">Категорії використовуються в задачах, проєктах і аналітиці.</p>
                 </div>
               </div>
-              <form id="domainForm" class="form-grid" style="margin-bottom:14px">
+              <form id="categoryForm" class="form-grid" style="margin-bottom:14px">
                 <div class="field">
-                  <label for="domainName">Назва домену</label>
-                  <input id="domainName" placeholder="Наприклад: Відео">
+                  <label for="categoryName">Назва категорії</label>
+                  <input id="categoryName" placeholder="Наприклад: Відео">
                 </div>
                 <div class="field">
-                  <label for="domainColor">Колір</label>
-                  <input id="domainColor" type="color" value="#29585E">
+                  <label for="categoryColor">Колір</label>
+                  <input id="categoryColor" type="color" value="#29585E">
                 </div>
-                <button class="btn btn-primary" type="submit"><i data-lucide="plus"></i> Додати домен</button>
+                <button class="btn btn-primary" type="submit"><i data-lucide="plus"></i> Додати категорію</button>
               </form>
               <div>
                 ${state.domains.map(domain => `
                   <div class="domain-row">
-                    <div><span class="swatch" style="background:${domain.color}"></span><input value="${escapeHTML(domain.name)}" onchange="updateDomainName('${domain.id}', this.value)" title="Назва домену"></div>
-                    <input type="color" value="${domain.color}" onchange="updateDomainColor('${domain.id}', this.value)" title="Колір домену">
-                    <button class="btn btn-danger icon-btn" onclick="removeDomain('${domain.id}')" title="Видалити домен"><i data-lucide="trash-2"></i></button>
+                    <div><span class="swatch" style="background:${domain.color}"></span><input value="${escapeHTML(domain.name)}" onchange="updateDomainName('${domain.id}', this.value)" title="Назва категорії"></div>
+                    <input type="color" value="${domain.color}" onchange="updateDomainColor('${domain.id}', this.value)" title="Колір категорії">
+                    <button class="btn btn-danger icon-btn" onclick="removeDomain('${domain.id}')" title="Видалити категорію"><i data-lucide="trash-2"></i></button>
                   </div>
                 `).join('')}
               </div>
@@ -2602,15 +3046,15 @@
           </div>
         </div>
       `;
-      document.getElementById('domainForm')?.addEventListener('submit', event => {
+      document.getElementById('categoryForm')?.addEventListener('submit', event => {
         event.preventDefault();
         addDomain();
       });
     }
 
     function addDomain() {
-      const name = document.getElementById('domainName').value.trim();
-      const color = document.getElementById('domainColor').value;
+      const name = document.getElementById('categoryName').value.trim();
+      const color = document.getElementById('categoryColor').value;
       if (!name) return showToast('Вкажіть назву домену.');
       if (state.domains.some(d => d.name.toLowerCase() === name.toLowerCase())) return showToast('Такий домен уже існує.');
       state.domains.push({ id: uid(), name, color });
@@ -2624,7 +3068,7 @@
       if (!domain) return;
       domain.color = color;
       saveState();
-      showToast('Колір домену оновлено.');
+      showToast('Колір категорії оновлено.');
       render();
     }
 
@@ -2965,6 +3409,7 @@
 
       document.getElementById('projectTitle').value = project?.title || '';
       document.getElementById('projectDomain').value = project?.domain || state.domains[0]?.name || 'Дизайн';
+      document.getElementById('projectStatus').value = project?.projectStatus || 'active';
       document.getElementById('projectStage').value = project?.stage || '';
       setDatepickerValue('projectDue', project?.due || addDays(7));
       const colors = parseCoverColors(project?.cover);
@@ -3035,6 +3480,41 @@
         showToast('Задачу закрито. Ближче до Pure Clarity.');
       }
       saveState();
+      rerenderActive();
+    }
+
+    function toggleBulkSelect(id, checked) {
+      if (checked) bulkSelected.add(id);
+      else bulkSelected.delete(id);
+      renderBoard();
+      requestAnimationFrame(renderIcons);
+    }
+
+    function bulkChangeStatus() {
+      const status = document.getElementById('bulkStatusSelect')?.value;
+      if (!status) { showToast('Оберіть статус.'); return; }
+      let count = 0;
+      state.tasks.forEach(t => {
+        if (bulkSelected.has(t.id)) {
+          t.status = status;
+          if (status === 'done') t.completedAt = todayISO();
+          else if (t.completedAt) t.completedAt = null;
+          count++;
+        }
+      });
+      bulkSelected.clear();
+      saveState();
+      showToast(`Статус змінено для ${count} задач.`);
+      rerenderActive();
+    }
+
+    function bulkDelete() {
+      const count = bulkSelected.size;
+      if (!confirm(`Видалити ${count} задач? Це незворотно.`)) return;
+      state.tasks = state.tasks.filter(t => !bulkSelected.has(t.id));
+      bulkSelected.clear();
+      saveState();
+      showToast(`${count} задач видалено.`);
       rerenderActive();
     }
 
@@ -3196,6 +3676,7 @@
         id,
         title,
         domain: document.getElementById('projectDomain').value,
+        projectStatus: document.getElementById('projectStatus').value,
         stage: document.getElementById('projectStage').value.trim(),
         due: due || addDays(7),
         cover: coverGradient(document.getElementById('projectCoverA').value, document.getElementById('projectCoverB').value),
@@ -3274,7 +3755,12 @@
     document.getElementById('newTaskBtn').addEventListener('click', () => openTaskModal());
     document.querySelectorAll('[data-close-modal]').forEach(btn => btn.addEventListener('click', closeTaskModal));
     document.querySelectorAll('[data-close-project]').forEach(btn => btn.addEventListener('click', closeProjectModal));
-
+    document.getElementById('taskModal').addEventListener('click', event => {
+      if (event.target.id === 'taskModal') closeTaskModal();
+    });
+    document.getElementById('projectModal').addEventListener('click', event => {
+      if (event.target.id === 'projectModal') closeProjectModal();
+    });
     document.getElementById('themeBtn').addEventListener('click', () => {
       const isDark = document.body.dataset.theme === 'dark';
       document.body.dataset.theme = isDark ? 'light' : 'dark';
@@ -3380,6 +3866,15 @@
     window.saveAppIdentity = saveAppIdentity;
     window.applyQuickFilter = applyQuickFilter;
     window.clearAdvFilters = clearAdvFilters;
+    window.setProjectFilter = setProjectFilter;
+    window.clearProjectFilters = clearProjectFilters;
+    window.toggleBulkSelect = toggleBulkSelect;
+    window.bulkChangeStatus = bulkChangeStatus;
+    window.bulkDelete = bulkDelete;
+    window.startEditNote = startEditNote;
+    window.cancelEditNote = cancelEditNote;
+    window.saveEditNote = saveEditNote;
+    window.renderKanban = renderKanban;
     window.addProjectTabPrompt = addProjectTabPrompt;
     window.removeProjectTab = removeProjectTab;
     window.editProjectTabLabel = editProjectTabLabel;
